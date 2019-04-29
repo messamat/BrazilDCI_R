@@ -8,6 +8,7 @@ library(igraph) # library graph theory
 library(data.table)
 library(tictoc)
 library(plyr)
+library(magrittr)
 library(microbenchmark)
 # library(devtools)
 # devtools::install_github("hadley/lineprof")
@@ -111,92 +112,65 @@ DCIp <- function(d2, d3, print = NULL){
 
 
 ##### LEVEL 8 ######
-
-# Identify possible scenatios
-scenarios <- c("All_current.txt", "All_future.txt", "SHP_current.txt", "SHP_future.txt", "LHP_current.txt", "LHP_future.txt")
-
 ## Loop over scenarios
 indir <- resdir
 level <- 8
 scenario_vector <- scenarios
 x <- 1
-scenarioloop1 <- function(indir, level, scenario_vector, x, passprob=0.1) {
-  scenarioFileBasin <- file.path(resdir, paste0("Brazil_L", level, "_", scenarios[x]))
-  scenarioFileDams <- file.path(resdir, paste0("DamAttributes_L", level, "_", scenarios[x]))
-  
-  ## Import BAT outputs
-  # Import network data (fragments - nodes)
-  NetworkBRAZILcrude <- fread(scenarioFileBasin, stringsAsFactors=T, data.table=T, integer64="numeric")
-  # Import dams data (links - edges)
-  DamAttributes <- fread(scenarioFileDams, stringsAsFactors=T, data.table=T, integer64="numeric")
-  
-  # Exclude reach IDs with problems (bugs in the polylines)
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61407347),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 60700186),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 60945892),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61019316),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61148586),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61167136),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61044254),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61007902),]
-  NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 60981081),]
-  NetworkBRAZIL <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61408559),]
-  
-  # Organize the matrix based on type and stage of each dam
-  levels(DamAttributes$ESTAGIO_1)[levels(DamAttributes$ESTAGIO_1) != "OperaÃ§Ã£o"] <- "Planned"
-  levels(DamAttributes$ESTAGIO_1)[levels(DamAttributes$ESTAGIO_1) == "OperaÃ§Ã£o"] <- "Operation"
-  levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) != "UHE"] <- "SHP"
-  levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) == "UHE"] <- "LHP"
-  
-  
-  ## Determine the basins present in the data       
-  basinList <- unique(NetworkBRAZIL$Region8)
-  
-  ## Create matrixes to fill out with data just for the first scenario (not necessary for the others)
-  ## Create a matrix of basins and DCIs         
-  ## Loop over basins
-  DCIlist <- sapply(basinList, function(j) {
-    #print(j)
-    ## filter attributes of the basin j         
-    BasinX <- NetworkBRAZIL[NetworkBRAZIL$Region8 == j, ]
-    DamX <- DamAttributes[DamAttributes$batRegion == j, ]
+passprob=0.1
 
-    
-    ### DCI Analysis
-    # Create a sequence ranging from 1 to the maximum number of segments
-    Lsegments <- min(unique(BasinX$batNetID))
-    Numbsegments <- length(unique(BasinX$batNetID))
+# Identify possible scenatios
+scenarios <- c("All_current.txt", "All_future.txt", "SHP_current.txt", "SHP_future.txt", "LHP_current.txt", "LHP_future.txt")
 
-    # Determine that basins with no dams have DCI = 100
-    if (Numbsegments == 1){
-      return(100)
-      #DCI_BRAZIL_L8[j, x+1] <- 100
-    }
+tic()
+#Read in all scenarios
+NetworkBRAZILcrude <- lapply(seq_along(scenarios), function(i) {
+  scenariotab <- fread(file.path(resdir, paste0("Brazil_L", level, "_", scenarios[i])),
+                       stringsAsFactors=T, data.table=T, integer64="numeric")
+  scenariotab[, scenario := scenarios[i]]
+}) %>%
+  rbindlist
 
-    ## For basins with dams, DCI is calculated below
-    if (Numbsegments > 1){
-      ## Compile the data on the edges (dam attributes)
-      d2 <- DamX[, list(
-        id1 = paste("seg", Min_batNet, sep =""), #DownSeg
-        id2 = paste("seg", Max_batNet, sep =""), #UpSeg
-        Type = Tipo_1,
-        Situation = ESTAGIO_1,
-        ID_number = FID,
-        ID_name = NOME,
-        Basin = batRegion,
-        pass = passprob
-      )]
-      # attributes of nodes; node sizes
-      d3 = BasinX[, list(id=paste0("seg", batNetID),
-                         l=sum(Shape_Leng)), by=batNetID]
-      
-      # Run DCI analysis for the basin
-      return(DCIp(d2, d3, print = F))
-      #DCI_BRAZIL_L8[j, x+1] <- DCIp(d2, d3, print = F)
-    }
-  })
-  return(DCIlist)
-}
+
+DamAttributes <- lapply(seq_along(scenarios), function(i) {
+  scenariotab <- fread(file.path(resdir, paste0("DamAttributes_L", level, "_", scenarios[i])),
+                       stringsAsFactors=T, data.table=T, integer64="numeric")
+  scenariotab[, scenario := scenarios[i]]
+}) %>%
+  rbindlist 
+
+# Organize the matrix based on type and stage of each dam
+DamAttributes[, ESTAGIO_1 := factor(ifelse(ESTAGIO_1 == "OperaÃ§Ã£o", 'Operation', 'Planned'), 
+                                    levels=c('Operation', 'Planned'))]
+DamAttributes[, Tipo_1 := factor(ifelse(Tipo_1 == "UHE", 'LHP', 'SHP'), 
+                                    levels=c('SHP', 'LHP'))]
+
+# Exclude reach IDs with problems (bugs in the polylines)
+outreaches = c(61407347, 60700186, 60945892, 61019316, 61148586, 
+               61167136, 61044254, 61007902, 60981081, 61408559)
+NetworkBRAZIL <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID %in% outreaches),]
+NetworkBRAZIL[, Numbsegments :=length(unique(batNetID)), by =.(scenario, Region8)]
+
+
+  
+DCIall <- NetworkBRAZIL[Numbsegments > 1,
+                        list(DCI = DCIp(DamAttributes[batRegion == Region8 & 
+                                                        scenario==scenario,
+                                                      list(
+                                                        id1 = paste("seg", Min_batNet, sep =""), #DownSeg
+                                                        id2 = paste("seg", Max_batNet, sep =""), #UpSeg
+                                                        Type = Tipo_1,
+                                                        Situation = ESTAGIO_1,
+                                                        ID_number = FID,
+                                                        ID_name = NOME,
+                                                        Basin = batRegion,
+                                                        pass = passprob
+                                                      )],
+                                        .SD[, list(id=paste0("seg", batNetID),
+                                                   l=sum(Shape_Leng)), by=batNetID],
+                                        print = F)),
+                        by=.(Region8, scenario)]
+toc()
 
 scenarioloop2 <- function(indir, level, scenario_vector, x) {
   scenarioFileBasin <- file.path(resdir, paste0("Brazil_L", level, "_", scenarios[x]))
@@ -204,9 +178,9 @@ scenarioloop2 <- function(indir, level, scenario_vector, x) {
   
   ## Import BAT outputs
   # Import network data (fragments - nodes)
-  NetworkBRAZILcrude <- fread(scenarioFileBasin, stringsAsFactors=T, data.table=F, integer64="numeric")
+  NetworkBRAZILcrude <- read.csv(scenarioFileBasin, header=T)
   # Import dams data (links - edges)
-  DamAttributes <- fread(scenarioFileDams, stringsAsFactors=T, data.table=F, integer64="numeric")
+  DamAttributes <- read.csv(scenarioFileDams, header=T)
   
   # Exclude reach IDs with problems (bugs in the polylines)
   NetworkBRAZILcrude <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID == 61407347),]
@@ -226,14 +200,14 @@ scenarioloop2 <- function(indir, level, scenario_vector, x) {
   levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) != "UHE"] <- "SHP"
   levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) == "UHE"] <- "LHP"
   
-  
-  ## Determine the basins present in the data       
+    ## Determine the basins present in the data       
   basinList <- unique(NetworkBRAZIL$Region8)
   
   ## Create matrixes to fill out with data just for the first scenario (not necessary for the others)
   ## Create a matrix of basins and DCIs         
   ## Loop over basins
   #DCIlist <- sapply(basinList, function(j) {
+  DCIlist <- c()
   for (j in seq_along(basinList)) {
     #print(j)
     ## filter attributes of the basin j         
@@ -250,7 +224,7 @@ scenarioloop2 <- function(indir, level, scenario_vector, x) {
     # Determine that basins with no dams have DCI = 100
     if (Numbsegments == 1){
       #return(100)
-      DCI_BRAZIL_L8[j, x+1] <- 100
+      DCIlist[j] <- 100
     }
     
     ## For basins with dams, DCI is calculated below
@@ -287,25 +261,27 @@ scenarioloop2 <- function(indir, level, scenario_vector, x) {
       
       # Run DCI analysis for the basin
       #return(DCIp(d2, d3, print = F))
-      DCI_BRAZIL_L8[j, x+1] <- DCIp(d2, d3, print = F)
+      DCIlist[j] <- DCIp(d2, d3, print = F)
     }
   }
   return(DCIlist)
 }
 
 
-microbenchmark(
-  forloop = scenarioloop1(resdir, level=8, scenario_vector=scenarios, x=x),
-  applyloop = scenarioloop2(resdir, level=8, scenario_vector=scenarios, x=x),
-  times=5
-)
+# microbenchmark(
+#   forloop = scenarioloop1(resdir, level=8, scenario_vector=scenarios, x=x),
+#   applyloop = scenarioloop2(resdir, level=8, scenario_vector=scenarios, x=x),
+#   times=5
+# )
+# 
+# l1 <- lineprof(DCIp(d2, d3, print=F), torture=T)
+# l1
+# shine(l1)
 
-l1 <- lineprof(scenarioloop1(resdir, level=8, scenario_vector=scenarios, x=1))
-l1
 
-
-
+tic()
 for (x in 1: length(scenarios)){
+  print(x)
   if (x==1) {
     DCI_BRAZIL_L8 <- matrix(NA, nrow = length(basinList), ncol = 7)
     colnames(DCI_BRAZIL_L8) <- c("HYBAS_ID", "All_curr", "All_fut", "SHP_curr", "SHP_fut", "LHP_curr", "LHP_fut")
@@ -320,11 +296,7 @@ for (x in 1: length(scenarios)){
     colnames(basinMWDams_L8) <- c("HYBAS_ID", "MW_All_curr", "MW_All_fut", "MW_SHP_curr", "MW_SHP_fut", "MW_LHP_curr", "MW_LHP_fut")
     basinMWDams_L8 [ , 1] <- basinList
   }
-  
-  tic()
-  DCIlist <- scenarioloop1(indir=resdir, level=8, scenario_vector=scenarions, x=x)
-  toc()
-  
+  DCIlist <- scenarioloop2(indir=resdir, level=8, scenario_vector=scenarios, x=x)
   DCI_BRAZIL_L8[, x+1] <- DCIlist
   
   #Vectorize join that
@@ -332,6 +304,7 @@ for (x in 1: length(scenarios)){
   # basinNDams_L8[, x + 1] <- dim(DamX)[1]
   # basinMWDams_L8[, x + 1] <- sum(DamX$POT_KW, na.rm = T)/1000 #kw to MW
 }
+toc()
 
 ## Create a csv file with the output of DCI analysis for all the scenarios
 write.csv(DCI_BRAZIL_L8, file = "DCI_Brazil_L8.csv")
