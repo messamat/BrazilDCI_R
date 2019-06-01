@@ -4,21 +4,27 @@
 #Requirements: Output from BAT tool
 
 library(rprojroot)
+library(sf)
 library(igraph) # library graph theory
 library(data.table)
 library(tictoc)
 library(plyr)
 library(magrittr)
 library(microbenchmark)
-# library(devtools)
+library(devtools)
 # devtools::install_github("hadley/lineprof")
 library(lineprof)
-source('dcibenchmarking.R')
+library(Rcpp)
+
+#To get Rcpp to work - install RBuildTools
+# Sys.setenv(Path = paste("C:/RBuildTools/3.4/bin", Sys.getenv("Path"), sep=";"))
+# Sys.setenv(BINPREF = "C:/RBuildTools/3.4/mingw_64/bin/")
 
 ########################################### Directory structure ########################################
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 datadir <- file.path(rootdir, "data")
+dcigdb <- file.path(resdir, 'dci.gdb')
 
 ########################################### Functions ########################################
 DCIp <- function(d2, d3, print = NULL){
@@ -29,12 +35,12 @@ DCIp <- function(d2, d3, print = NULL){
   d3 = data frame containing all segments and its respective sizes
   d3$id = the ID of each segment; MUST BE FACTOR!
   d3$l = the SIZE of segments formed by barriers within a given river
-
+  
   OBS: d2 and d3 must have the same segment names (ID)
   d = edges; vertices = nodes"
   
   require(igraph)
-
+  
   graph <- graph.data.frame(d2, directed = F); #plot(graph)
   
   #calculating l_i/L ratio
@@ -105,11 +111,68 @@ DCIp <- function(d2, d3, print = NULL){
   return(sum(resu))
 }
 
-############################################################################################################
-###########################################################################################################
-########### RUN DCI - All levels dataset #################################################################
-#########################################################################################################
+#Function to get all combinations of 2 vectors (faster version of combn)
+#From https://stackoverflow.com/questions/26828301/faster-version-of-combn/26828486
+cppFunction('
+            Rcpp::DataFrame combi2inds(const Rcpp::CharacterVector inputVector){
+            const int len = inputVector.size();
+            const int retLen = len * (len-1) / 2;
+            Rcpp::IntegerVector outputVector1(retLen);
+            Rcpp::IntegerVector outputVector2(retLen);
+            int indexSkip;
+            for (int i = 0; i < len; ++i){
+            indexSkip = len * i - ((i+1) * i)/2;
+            for (int j = 0; j < len-1-i; ++j){
+            outputVector1(indexSkip+j) = i+1;
+            outputVector2(indexSkip+j) = i+j+1+1;
+            }
+            }
+            return(Rcpp::DataFrame::create(Rcpp::Named("xid") = outputVector1,
+            Rcpp::Named("yid") = outputVector2));
+            };
+            ')
 
+DCIp_opti <- function(d2, d3, print = NULL){
+  "d2 = a data frame containing the links between patches and passability for each link
+  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
+  d2$id2 = final segment (to) connection; MUST BE FACTOR!
+  d2$pass = the passability from one segment to the next
+  d3 = data frame containing all segments and its respective sizes
+  d3$id = the ID of each segment; MUST BE FACTOR!
+  d3$l = the SIZE of segments formed by barriers within a given river
+  
+  OBS: d2 and d3 must have the same segment names (ID)
+  d = edges; vertices = nodes"
+  
+  require(igraph)
+  
+  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  
+  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
+  d3$l_L <- d3$l/sum(d3$l)
+  
+  #Get lower triangle of matrix of all pairwise combination of segments
+  indices <- combi2inds(d3$id)
+  lowertricomb <- setDT(list(i=d3$id[indices$xid], k=d3$id[indices$yid])) #Does not include matrix diagonal
+  
+  DCImat <- function(x) {
+    #Compute connectivity for all unique pairs of segments in basin
+    return(prod(shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass) *
+             prod(d3[d3$id==x[1],'l_L'], d3[d3$id==x[2],'l_L']) *
+             100) 
+    }
+  
+  DCImatself <- function(x) {
+    #Compute connectivity within segments
+    return(1 * (d3[d3$id == x , 'l_L']^2) * 100)
+  }
+  resutri <- apply(lowertricomb, 1, DCImat)
+  resudia <- sapply(d3$id, DCImatself)
+  #Compute DCI by sum connectivity for full matrix of pairwise combination 
+  return(sum(resutri)*2+sum(resudia))
+}
+
+########### RUN DCI - All levels dataset #################################################################
 
 ##### LEVEL 8 ######
 ## Loop over scenarios
@@ -121,65 +184,89 @@ scenarios <- c("All_current.txt", "All_future.txt", "SHP_current.txt", "SHP_futu
 
 tic()
 #Read in all scenarios
-NetworkBRAZILcrude <- lapply(seq_along(scenarios), function(i) {
-  scenariotab <- fread(file.path(resdir, paste0("Brazil_L", level, "_", scenarios[i])),
-                       stringsAsFactors=T, data.table=T, integer64="numeric")
-  scenariotab[, scenario := scenarios[i]]
-}) %>%
-  rbindlist
+netcrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 
+# NetworkBRAZILcrude <- lapply(seq_along(scenarios), function(i) {
+#   scenariotab <- fread(file.path(resdir, paste0("Brazil_L", level, "_", scenarios[i])),
+#                        stringsAsFactors=T, data.table=T, integer64="numeric")
+#   scenariotab[, scenario := scenarios[i]]
+# }) %>%
+#   rbindlist
 
-DamAttributes <- lapply(seq_along(scenarios), function(i) {
-  scenariotab <- fread(file.path(resdir, paste0("DamAttributes_L", level, "_", scenarios[i])),
-                       stringsAsFactors=T, data.table=T, integer64="numeric")
-  scenariotab[, scenario := scenarios[i]]
-}) %>%
-  rbindlist 
+DamAttributes <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
+
+# DamAttributes <- lapply(seq_along(scenarios), function(i) {
+#   scenariotab <- fread(file.path(resdir, paste0("DamAttributes_L", level, "_", scenarios[i])),
+#                        stringsAsFactors=T, data.table=T, integer64="numeric")
+#   scenariotab[, scenario := scenarios[i]]
+# }) %>%
+#   rbindlist 
 
 # Organize the matrix based on type and stage of each dam
 DamAttributes[, ESTAGIO_1 := factor(ifelse(ESTAGIO_1 == "OperaÃ§Ã£o", 'Operation', 'Planned'), 
                                     levels=c('Operation', 'Planned'))]
 DamAttributes[, Tipo_1 := factor(ifelse(Tipo_1 == "UHE", 'LHP', 'SHP'), 
-                                    levels=c('SHP', 'LHP'))]
+                                 levels=c('SHP', 'LHP'))]
+
+DamAttributes[, `:=`(All_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation', 0.1, 1),
+                     All_future = 1,
+                     SHP_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHP_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'LHP', 0.1, 1),
+                     SHP_future = ifelse(DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHP_future = ifelse(DamAttributes$Tipo_1 == 'LHP', 0.1, 1)
+                     )]
 
 # Exclude reach IDs with problems (bugs in the polylines)
-outreaches = c(61407347, 60700186, 60945892, 61019316, 61148586, 
-               61167136, 61044254, 61007902, 60981081, 61408559)
-NetworkBRAZIL <- NetworkBRAZILcrude[-which(NetworkBRAZILcrude$REACH_ID %in% outreaches),]
-NetworkBRAZIL[, Numbsegments :=length(unique(batNetID)), by =.(scenario, Region8)]
+netcrude[!is.na(HYBAS_ID08),
+         list(DCI = DCIp_opti(
+           DamAttributes[DamAttributes$HYBAS_ID08 == HYBAS_ID08,
+                         list(
+                           id1 = DownSeg,
+                           id2 = UpSeg,
+                           pass = All_current
+                         )],
+           .SD[, list(id=as.character(SEGID),
+                      l=Shape_Length)],
+           print = F)),
+         by=.(HYBAS_ID08)]
 
 
-  
+#NetworkBRAZIL[, Numbsegments :=length(unique(batNetID)), by =.(scenario, Region8)]
+
+for (bas in DamAttributes[!is.na(HYBAS_ID08), unique(HYBAS_ID08)]) {
+  print(bas)
+  DCIp_opti(
+    DamAttributes[HYBAS_ID08 == bas,
+                  list(
+                    id1 = DownSeg,
+                    id2 = UpSeg,
+                    pass = All_current
+                  )],
+    netcrude[HYBAS_ID08 == bas,
+             list(id=as.character(SEGID),
+                  l=Shape_Length)]
+  )
+}
+
+
+
+#Get DCI for each basin
 DCIall <- NetworkBRAZIL[Numbsegments > 1,
-                        list(DCI = DCIp(DamAttributes[batRegion == Region8 & 
-                                                        scenario==scenario,
-                                                      list(
-                                                        id1 = paste("seg", Min_batNet, sep =""), #DownSeg
-                                                        id2 = paste("seg", Max_batNet, sep =""), #UpSeg
-                                                        Type = Tipo_1,
-                                                        Situation = ESTAGIO_1,
-                                                        ID_number = FID,
-                                                        ID_name = NOME,
-                                                        Basin = batRegion,
-                                                        pass = passprob
-                                                      )],
-                                        .SD[, list(id=paste0("seg", batNetID),
-                                                   l=sum(Shape_Leng)), by=batNetID],
-                                        print = F)),
+                        list(DCI = DCIp_opti(
+                          DamAttributes[batRegion == Region8 & scenario==scenario,
+                                        list(
+                                          id1 = paste("seg", Min_batNet, sep =""), #DownSeg
+                                          id2 = paste("seg", Max_batNet, sep =""), #UpSeg
+                                          pass = passprob
+                                        )],
+                          .SD[, list(id=paste0("seg", batNetID),
+                                     l=sum(Shape_Leng)), by=batNetID],
+                          print = F)),
                         by=.(Region8, scenario)]
 toc()
 
-
-
-# microbenchmark(
-#   forloop = scenarioloop1(resdir, level=8, scenario_vector=scenarios, x=x),
-#   applyloop = scenarioloop2(resdir, level=8, scenario_vector=scenarios, x=x),
-#   times=5
-# )
-# 
-l1 <- lineprof(DCIp(d2, d3, print=F), torture=T)
-l1
-# shine(l1)
 
 #Vectorize join that
 ### Attributes of the basin (N of dams, cumulative MW)
@@ -190,6 +277,36 @@ l1
 write.csv(DCI_BRAZIL_L8, file = "DCI_Brazil_L8.csv")
 write.csv(basinNDams_L8, file = "basinNDams_L8.csv")
 write.csv(basinMWDams_L8, file = "basinMWDams_L8.csv")
+
+
+#Get every possible future scenario
+damsall<- fread(file.path(resdir,"DamAttributes_L8_All_future.txt"),
+      stringsAsFactors=T, data.table=T, integer64="numeric")
+length(damsall[, unique(batRegion)])
+
+#For each region, create a list scenario with all possible permutations
+table(damsall[ESTAGIO_1 != "OperaÃ§Ã£o",.N, by=batRegion]$N)
+
+
+allscenarios <- ldply(unique(damsall[ESTAGIO_1 != "OperaÃ§Ã£o", batRegion]), function(reg) {
+  permut <- damsall[ESTAGIO_1 != "OperaÃ§Ã£o" & batRegion == reg, expand.grid(rep(list(c(0.1, 1)), .N))]
+  names(permut) <- damsall[ESTAGIO_1 != "OperaÃ§Ã£o" & batRegion == reg, FID]
+  scenarios_reg <- melt(cbind(region1, batRegion = paste(reg, rownames(region1), sep='_')), id.var="batRegion")
+  return(scenarios_reg)
+})
+
+DCIall <- NetworkBRAZIL[Numbsegments > 1,
+                        list(DCI = DCIp_opti(
+                          DamAttributes[batRegion == Region8 & scenario==scenario,
+                                        list(
+                                          id1 = paste("seg", Min_batNet, sep =""), #DownSeg
+                                          id2 = paste("seg", Max_batNet, sep =""), #UpSeg
+                                          pass = passprob
+                                        )],
+                          .SD[, list(id=paste0("seg", batNetID),
+                                     l=sum(Shape_Leng)), by=batNetID],
+                          print = F)),
+                        by=.(Region8, scenario)]
 
 
 
@@ -678,7 +795,7 @@ for (x in 1: length(scenarios)){
     
     print(x)
     print(j)
-
+    
     
   }
 }
@@ -847,14 +964,14 @@ resuMWDams <- as.data.frame(read.csv("basinMWDams_L10.csv", header = T))
 
 # plot(resuNDams$N_All_curr, resuDCI$All_curr, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams")
 plot(resuNDams$N_All_fut, resuDCI$All_fut, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams",
-pch = 21, col = "#42424220", bg = "#99999930")
+     pch = 21, col = "#42424220", bg = "#99999930")
 
 #plot(resuNDams$N_SHP_curr, resuDCI$SHP_curr, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams")
 plot(resuNDams$N_SHP_fut, resuDCI$SHP_fut, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams",
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 10")
 #plot(resuNDams$N_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams")
 points(resuNDams$N_LHP_fut, resuDCI$LHP_fut, ylim = c(0, 100), xlim = c(0, 9), ylab = "DCI", xlab = "Number of dams",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 8
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L8.csv", header = T))
@@ -869,7 +986,7 @@ plot(resuNDams$N_SHP_fut, resuDCI$SHP_fut, ylim = c(0, 100), xlim = c(0, 40), yl
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 8")
 #plot(resuNDams$N_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), xlim = c(0, 40), ylab = "DCI", xlab = "Number of dams")
 points(resuNDams$N_LHP_fut, resuDCI$LHP_fut, ylim = c(0, 100), xlim = c(0, 40), ylab = "DCI", xlab = "Number of dams",
-     pch = 21, col = "#42424220", bg = "#8B000030")
+       pch = 21, col = "#42424220", bg = "#8B000030")
 
 ## Level 6
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L6.csv", header = T))
@@ -884,7 +1001,7 @@ plot(resuNDams$N_SHP_fut, resuDCI$SHP_fut, ylim = c(0, 100), xlim = c(0, 150), y
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 6")
 # plot(resuNDams$N_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), xlim = c(0, 150), ylab = "DCI", xlab = "Number of dams")
 points(resuNDams$N_LHP_fut, resuDCI$LHP_fut, ylim = c(0, 100), xlim = c(0, 150), ylab = "DCI", xlab = "Number of dams",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 4
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L4.csv", header = T))
@@ -899,7 +1016,7 @@ plot(resuNDams$N_SHP_fut, resuDCI$SHP_fut, ylim = c(0, 100), xlim = c(0, 500), y
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 4")
 #plot(resuNDams$N_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), xlim = c(0, 500), ylab = "DCI", xlab = "Number of dams")
 points(resuNDams$N_LHP_fut, resuDCI$LHP_fut, ylim = c(0, 100), xlim = c(0, 500), ylab = "DCI", xlab = "Number of dams",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 
 
@@ -918,7 +1035,7 @@ plot(resuNDams$N_SHP_fut/SUBAreas_L10, resuDCI$SHP_fut, ylim = c(0, 100), ylab =
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 10")
 #plot(resuNDams$N_LHP_curr/SUBAreas_L10, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)")
 points(resuNDams$N_LHP_fut/SUBAreas_L10, resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 8
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L8.csv", header = T))
@@ -933,7 +1050,7 @@ plot(resuNDams$N_SHP_fut/SUBAreas_L8, resuDCI$SHP_fut, ylim = c(0, 100), ylab = 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 8")
 #plot(resuNDams$N_LHP_curr/SUBAreas_L8, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)")
 points(resuNDams$N_LHP_fut/SUBAreas_L8, resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 6
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L6.csv", header = T))
@@ -948,7 +1065,7 @@ plot(resuNDams$N_SHP_fut/SUBAreas_L6, resuDCI$SHP_fut, ylim = c(0, 100), ylab = 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 6")
 #plot(resuNDams$N_LHP_curr/SUBAreas_L6, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)")
 points(resuNDams$N_LHP_fut/SUBAreas_L6, resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 4
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L4.csv", header = T))
@@ -963,7 +1080,7 @@ plot(resuNDams$N_SHP_fut/SUBAreas_L4, resuDCI$SHP_fut, ylim = c(0, 100), ylab = 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 4")
 #plot(resuNDams$N_LHP_curr/SUBAreas_L4, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)")
 points(resuNDams$N_LHP_fut/SUBAreas_L4, resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Dernsity of dams (km2)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 
 
@@ -984,7 +1101,7 @@ plot(log(resuMWDams$MW_SHP_fut), resuDCI$SHP_fut, xlim = c(-7, 10), ylim = c(0, 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 10")
 #plot(resuMWDams$MW_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)")
 points(log(resuMWDams$MW_LHP_fut), resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 8
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L8.csv", header = T))
@@ -999,7 +1116,7 @@ plot(log(resuMWDams$MW_SHP_fut), resuDCI$SHP_fut, xlim = c(-7, 10), ylim = c(0, 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 8")
 #plot(resuMWDams$MW_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)")
 points(log(resuMWDams$MW_LHP_fut), resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 6
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L6.csv", header = T))
@@ -1014,7 +1131,7 @@ plot(log(resuMWDams$MW_SHP_fut), resuDCI$SHP_fut, xlim = c(-5, 10), ylim = c(0, 
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 6")
 #plot(resuMWDams$MW_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)")
 points(log(resuMWDams$MW_LHP_fut), resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 ## Level 4
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L4.csv", header = T))
@@ -1029,7 +1146,7 @@ plot(log(resuMWDams$MW_SHP_fut), resuDCI$SHP_fut, xlim = c(0, 10), ylim = c(0, 1
      pch = 21, col = "#42424220", bg = "#4876FF40", main = "Level 4")
 #plot(resuMWDams$MW_LHP_curr, resuDCI$LHP_curr, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)")
 points(log(resuMWDams$MW_LHP_fut), resuDCI$LHP_fut, ylim = c(0, 100), ylab = "DCI", xlab = "Capacity (MW)",
-     pch = 21, col = "#42424220", bg = "#8B000020")
+       pch = 21, col = "#42424220", bg = "#8B000020")
 
 
 
