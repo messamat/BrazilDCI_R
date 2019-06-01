@@ -218,44 +218,36 @@ DamAttributes[, `:=`(All_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation'
                      LHP_future = ifelse(DamAttributes$Tipo_1 == 'LHP', 0.1, 1)
                      )]
 
-# Exclude reach IDs with problems (bugs in the polylines)
-netcrude[!is.na(HYBAS_ID08),
-         list(DCI = DCIp_opti(
-           DamAttributes[DamAttributes$HYBAS_ID08 == HYBAS_ID08,
-                         list(
-                           id1 = DownSeg,
-                           id2 = UpSeg,
-                           pass = All_current
-                         )],
-           .SD[, list(id=as.character(SEGID),
-                      l=Shape_Length)],
-           print = F)),
-         by=.(HYBAS_ID08)]
+#Slightly rename basin id for dams to avoid conflicts in data.table processing
+setnames(DamAttributes, c('HYBAS_ID04', 'HYBAS_ID06', 'HYBAS_ID08'), c('DAMBASID04','DAMBASID06','DAMBASID08'))
 
+#Correct few glitches from exceptions that can be automatically corrected later
+#(here, the dam sits at the downstream confluence of a mainstem and a first order stream)
+bug1 <- DamAttributes[DAMBASID08 == 6080440420 & DownSeg==1676,]
+bug1[, UpSeg := 1679]
+DamAttributes <- rbind(DamAttributes, bug1)
 
-#NetworkBRAZIL[, Numbsegments :=length(unique(batNetID)), by =.(scenario, Region8)]
-DamAttributes <- as.data.table(rbind(DamAttributes[, .(HYBAS_ID08, UpSeg, DownSeg, All_current)],
-                                     data.frame(HYBAS_ID08 = bas, UpSeg='1679', DownSeg='1676', All_current=0.1)))
-
-x=0
-for (bas in DamAttributes[!is.na(HYBAS_ID08), unique(HYBAS_ID08)]) {
-  print(bas)
-  print(x)
-  DCIp_opti(
-    DamAttributes[HYBAS_ID08 == bas,
-                  list(
-                    id1 = DownSeg,
-                    id2 = UpSeg,
-                    pass = All_current
-                  )],
-    netcrude[HYBAS_ID08 == bas,
-             list(id=as.character(SEGID),
-                  l=Shape_Length)]
-  )
-  x=x+1
-}
+#Compute DCI
+dambas08 = DamAttributes[!is.na(DAMBASID08), unique(DAMBASID08)]
+DCI_L8 <- netcrude[HYBAS_ID08 %in% dambas08,
+                   list(DCI = DCIp_opti(
+                     DamAttributes[DAMBASID08 == HYBAS_ID08,
+                                   list(
+                                     id1 = DownSeg,
+                                     id2 = UpSeg,
+                                     pass = All_current
+                                   )],
+                     .SD[, list(id=as.character(SEGID),
+                                l=Shape_Length)],
+                     print = F)),
+                   by=.(HYBAS_ID08)]
 toc()
 
+
+#To do going forward:
+#Join back to basins, all others are 100 (no dams) or Null (if not in netcrude, because coastal)
+#To add multiple scenarios, can melt DamAttributes by scenario
+#To run in parallel, could divide scenarios into 4-8 chunks and run as a foreach loop or parallel apply
 
 #Vectorize join that
 ### Attributes of the basin (N of dams, cumulative MW)
