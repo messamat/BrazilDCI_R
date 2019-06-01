@@ -180,7 +180,7 @@ level <- 8
 passprob=0.1
 
 # Identify possible scenatios
-scenarios <- c("All_current.txt", "All_future.txt", "SHP_current.txt", "SHP_future.txt", "LHP_current.txt", "LHP_future.txt")
+# scenarios <- c("All_current.txt", "All_future.txt", "SHP_current.txt", "SHP_future.txt", "LHP_current.txt", "LHP_future.txt")
 
 tic()
 #Read in all scenarios
@@ -194,13 +194,13 @@ netcrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 #   rbindlist
 
 DamAttributes <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
-
+# 
 # DamAttributes <- lapply(seq_along(scenarios), function(i) {
 #   scenariotab <- fread(file.path(resdir, paste0("DamAttributes_L", level, "_", scenarios[i])),
 #                        stringsAsFactors=T, data.table=T, integer64="numeric")
 #   scenariotab[, scenario := scenarios[i]]
 # }) %>%
-#   rbindlist 
+#   rbindlist
 
 # Organize the matrix based on type and stage of each dam
 DamAttributes[, ESTAGIO_1 := factor(ifelse(ESTAGIO_1 == "OperaÃ§Ã£o", 'Operation', 'Planned'), 
@@ -234,9 +234,13 @@ netcrude[!is.na(HYBAS_ID08),
 
 
 #NetworkBRAZIL[, Numbsegments :=length(unique(batNetID)), by =.(scenario, Region8)]
+DamAttributes <- as.data.table(rbind(DamAttributes[, .(HYBAS_ID08, UpSeg, DownSeg, All_current)],
+                                     data.frame(HYBAS_ID08 = bas, UpSeg='1679', DownSeg='1676', All_current=0.1)))
 
+x=0
 for (bas in DamAttributes[!is.na(HYBAS_ID08), unique(HYBAS_ID08)]) {
   print(bas)
+  print(x)
   DCIp_opti(
     DamAttributes[HYBAS_ID08 == bas,
                   list(
@@ -248,23 +252,8 @@ for (bas in DamAttributes[!is.na(HYBAS_ID08), unique(HYBAS_ID08)]) {
              list(id=as.character(SEGID),
                   l=Shape_Length)]
   )
+  x=x+1
 }
-
-
-
-#Get DCI for each basin
-DCIall <- NetworkBRAZIL[Numbsegments > 1,
-                        list(DCI = DCIp_opti(
-                          DamAttributes[batRegion == Region8 & scenario==scenario,
-                                        list(
-                                          id1 = paste("seg", Min_batNet, sep =""), #DownSeg
-                                          id2 = paste("seg", Max_batNet, sep =""), #UpSeg
-                                          pass = passprob
-                                        )],
-                          .SD[, list(id=paste0("seg", batNetID),
-                                     l=sum(Shape_Leng)), by=batNetID],
-                          print = F)),
-                        by=.(Region8, scenario)]
 toc()
 
 
@@ -295,18 +284,18 @@ allscenarios <- ldply(unique(damsall[ESTAGIO_1 != "OperaÃ§Ã£o", batRegion]),
   return(scenarios_reg)
 })
 
-DCIall <- NetworkBRAZIL[Numbsegments > 1,
-                        list(DCI = DCIp_opti(
-                          DamAttributes[batRegion == Region8 & scenario==scenario,
-                                        list(
-                                          id1 = paste("seg", Min_batNet, sep =""), #DownSeg
-                                          id2 = paste("seg", Max_batNet, sep =""), #UpSeg
-                                          pass = passprob
-                                        )],
-                          .SD[, list(id=paste0("seg", batNetID),
-                                     l=sum(Shape_Leng)), by=batNetID],
-                          print = F)),
-                        by=.(Region8, scenario)]
+# DCIall <- NetworkBRAZIL[Numbsegments > 1,
+#                         list(DCI = DCIp_opti(
+#                           DamAttributes[batRegion == Region8 & scenario==scenario,
+#                                         list(
+#                                           id1 = paste("seg", Min_batNet, sep =""), #DownSeg
+#                                           id2 = paste("seg", Max_batNet, sep =""), #UpSeg
+#                                           pass = passprob
+#                                         )],
+#                           .SD[, list(id=paste0("seg", batNetID),
+#                                      l=sum(Shape_Leng)), by=batNetID],
+#                           print = F)),
+#                         by=.(Region8, scenario)]
 
 
 
