@@ -1,7 +1,7 @@
 #Developers: Thiago B. Couto; Mathis L. Messager
 #Creation date: 
 #Purpose: Compute riverine fragmentation by hydropower development in Brazil with the Dendritic Connectivity Index 
-#Requirements: Output from BAT tool
+#Requirements: Output from GIS fragmentation analysis
 
 library(rprojroot)
 library(sf)
@@ -15,6 +15,7 @@ library(devtools)
 # devtools::install_github("hadley/lineprof")
 library(lineprof)
 library(Rcpp)
+library(stringr)
 
 #To get Rcpp to work - install RBuildTools
 # Sys.setenv(Path = paste("C:/RBuildTools/3.4/bin", Sys.getenv("Path"), sep=";"))
@@ -262,7 +263,7 @@ DamAttributes[, `:=`(All_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation'
                      )]
 
 #Slightly rename basin id for dams to avoid conflicts in data.table processing
-setnames(DamAttributes, c('HYBAS_ID04', 'HYBAS_ID06', 'HYBAS_ID08'), c('DAMBASID04','DAMBASID06','DAMBASID08'))
+setnames(DamAttributes, c('HYBAS_ID08'), c('DAMBASID08'))
 
 #Correct few glitches from exceptions that can be automatically corrected later
 #(here, the dam sits at the downstream confluence of a mainstem and a first order stream)
@@ -270,22 +271,67 @@ bug1 <- DamAttributes[DAMBASID08 == 6080440420 & DownSeg==1676,]
 bug1[, UpSeg := 1679]
 DamAttributes <- rbind(DamAttributes, bug1)
 
-#Compute DCI
-dambas08 = DamAttributes[!is.na(DAMBASID08), unique(DAMBASID08)]
-DCI_L8_current <- netcrude[HYBAS_ID08 %in% dambas08,
-                   list(DCI = DCIp_opti(
-                     DamAttributes[DAMBASID08 == HYBAS_ID08,
-                                   list(
-                                     id1 = DownSeg,
-                                     id2 = UpSeg,
-                                     pass = All_current
-                                   )],
-                     .SD[, list(id=as.character(SEGID),
-                                l=Shape_Length)],
-                     print = F)),
-                   by=.(HYBAS_ID08)]
-toc()
+#Keep only network within basins that contain dams, excluding coastal segments without dams
+#(only keep segments that are either in UpSeg or DownSeg of a dam and within a basin with a dam)
+dambas08 <- DamAttributes[!is.na(DAMBASID08), unique(DAMBASID08)] #vector of all basins that contain a dam
+netdams <- netcrude[((paste(SEGID, HYBAS_ID08) %in% paste(DamAttributes$UpSeg, DamAttributes$DAMBASID08)) |
+                       (paste(SEGID, HYBAS_ID08) %in% paste(DamAttributes$DownSeg, DamAttributes$DAMBASID08))) &
+                      HYBAS_ID08 %in% dambas08,][
+                        , SEGIDBAS := paste(SEGID, HYBAS_ID08, sep='_')] 
 
+#Identify basins with multiple networks that have dams
+#Assign an extra digit to basins to account for those that have multiple networks with dams
+multibas <- netdams[(SEGID %in% DamAttributes$DownSeg) & 
+                      !(SEGID %in% DamAttributes$UpSeg),][
+                        , .N, by=HYBAS_ID08][
+                          N>1, HYBAS_ID08]
+DamAttributes[, `:=`(DownSegBAS = paste(DownSeg, DAMBASID08, sep='_'),
+                     UpSegBAS = paste(UpSeg, DAMBASID08, sep='_'),
+                     SEGIDDAMBAS = paste(SEGID, DAMBASID08, sep='_'))]
+
+coastdamSEG <- netdams[(SEGID %in% DamAttributes$DownSeg) & 
+                         !(SEGID %in% DamAttributes$UpSeg) &
+                         HYBAS_ID08 %in% multibas,][
+                             , HYBAS_ID08ext := paste0(HYBAS_ID08, seq_len(.N)), by = HYBAS_ID08]
+
+seg_list <- c()
+for (segnum in seq_along(coastdamSEG$HYBAS_ID08)) {
+  seg_mouth <- coastdamSEG[segnum,]
+  seg_iter <- seg_mouth
+  while (nrow(seg_iter)>0) {
+    seg_list <- c(seg_list, paste(seg_iter$SEGID, seg_mouth$HYBAS_ID08ext, sep='_'))
+    seg_iter <- DamAttributes[DownSegBAS == seg_iter$SEGIDBAS,] 
+  }
+}
+
+netdams <- merge(netdams, 
+                 data.frame(HYBAS_ID08ext = str_split(seg_list, '_', simplify=T)[,2], 
+                            SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
+                 by='SEGIDBAS', all.x=T)
+netdams[is.na(HYBAS_ID08ext), HYBAS_ID08ext := paste0(HYBAS_ID08, 1)]
+
+
+DamAttributes <- merge(DamAttributes, 
+                 data.frame(DAMBASID08ext = str_split(seg_list, '_', simplify=T)[,2], 
+                            SEGIDDAMBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
+                 by='SEGIDDAMBAS', all.x=T)
+DamAttributes[is.na(DAMBASID08ext), DAMBASID08ext := paste0(DAMBASID08, 1)]
+
+
+#Compute DCI
+DCI_L8_current <- netdams[,
+                          list(DCI = DCIp_opti(
+                            DamAttributes[DAMBASID08ext == HYBAS_ID08ext,
+                                          list(
+                                            id1 = DownSeg,
+                                            id2 = UpSeg,
+                                            pass = All_current
+                                          )],
+                            .SD[, list(id=as.character(SEGID),
+                                       l=Shape_Length)],
+                            print = F)),
+                          by=.(HYBAS_ID08ext)]
+toc()
 
 #To do going forward:
 #Join back to basins, all others are 100 (no dams) or Null (if not in netcrude, because coastal)
@@ -320,14 +366,14 @@ allscenarios_seg <- merge(allscenarios, DamAttributes[, .(DAMID, DownSeg, UpSeg)
 length(unique(allscenarios$DAMBASID08_scenario))
 
 
-d2 <- netcrude[HYBAS_ID08 == 6080704460, DamAttributes[DAMBASID08 == 6080704460,
+d2 <- netdams[HYBAS_ID08 == 6080704460, DamAttributes[DAMBASID08 == 6080704460,
                                                                             list(
                                                                                 id1 = DownSeg,
                                                                                 id2 = UpSeg,
                                                                                 pass = All_current
                                                                               )]]
 #To run on subset
-DCI_L8_all<- netcrude[HYBAS_ID08 %in% dambas08,
+DCI_L8_all<- netdams[HYBAS_ID08 %in% dambas08,
                            list(DCI = DCIp_opti(
                              DamAttributes[DAMBASID08 == HYBAS_ID08,
                                            list(
