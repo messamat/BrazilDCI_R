@@ -271,29 +271,34 @@ bug1 <- DamAttributes[DAMBASID08 == 6080440420 & DownSeg==1676,]
 bug1[, UpSeg := 1679]
 DamAttributes <- rbind(DamAttributes, bug1)
 
+#------ DEAL WITH COASTAL DRAINAGES ------
 #Keep only network within basins that contain dams, excluding coastal segments without dams
 #(only keep segments that are either in UpSeg or DownSeg of a dam and within a basin with a dam)
 dambas08 <- DamAttributes[!is.na(DAMBASID08), unique(DAMBASID08)] #vector of all basins that contain a dam
 netdams <- netcrude[((paste(SEGID, HYBAS_ID08) %in% paste(DamAttributes$UpSeg, DamAttributes$DAMBASID08)) |
                        (paste(SEGID, HYBAS_ID08) %in% paste(DamAttributes$DownSeg, DamAttributes$DAMBASID08))) &
                       HYBAS_ID08 %in% dambas08,][
-                        , SEGIDBAS := paste(SEGID, HYBAS_ID08, sep='_')] 
+                        , SEGIDBAS := paste(SEGID, HYBAS_ID08, sep='_')]  #Create a new ID for segments that combines segment IDs and basin IDs
 
-#Identify basins with multiple networks that have dams
-#Assign an extra digit to basins to account for those that have multiple networks with dams
-multibas <- netdams[(SEGID %in% DamAttributes$DownSeg) & 
-                      !(SEGID %in% DamAttributes$UpSeg),][
-                        , .N, by=HYBAS_ID08][
-                          N>1, HYBAS_ID08]
+#Create a new ID for dams that combines segment IDs and basin IDs
 DamAttributes[, `:=`(DownSegBAS = paste(DownSeg, DAMBASID08, sep='_'),
                      UpSegBAS = paste(UpSeg, DAMBASID08, sep='_'),
                      SEGIDDAMBAS = paste(SEGID, DAMBASID08, sep='_'))]
 
+#Identify basins with multiple networks that have dams 
+#(Find those basins that have multiple segments with no downstream dam i.e. multiple outlets)
+multibas <- netdams[(SEGID %in% DamAttributes$DownSeg) & 
+                      !(SEGID %in% DamAttributes$UpSeg),][
+                        , .N, by=HYBAS_ID08][
+                          N>1, HYBAS_ID08]
+
+#For those, assign an extra digit to basins to account for those that have multiple networks with dams
 coastdamSEG <- netdams[(SEGID %in% DamAttributes$DownSeg) & 
                          !(SEGID %in% DamAttributes$UpSeg) &
                          HYBAS_ID08 %in% multibas,][
                              , HYBAS_ID08ext := paste0(HYBAS_ID08, seq_len(.N)), by = HYBAS_ID08]
 
+#Find connected segments within that basin to identify them as part of that subbasin
 seg_list <- c()
 for (segnum in seq_along(coastdamSEG$HYBAS_ID08)) {
   seg_mouth <- coastdamSEG[segnum,]
@@ -304,13 +309,14 @@ for (segnum in seq_along(coastdamSEG$HYBAS_ID08)) {
   }
 }
 
+#Assign new subbasin ID too all river segments (simply HYBAS_ID08 + '1' if not multiple networks)
 netdams <- merge(netdams, 
                  data.frame(HYBAS_ID08ext = str_split(seg_list, '_', simplify=T)[,2], 
                             SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
                  by='SEGIDBAS', all.x=T)
 netdams[is.na(HYBAS_ID08ext), HYBAS_ID08ext := paste0(HYBAS_ID08, 1)]
 
-
+#Assign new subbasin ID too all dams (simply DAMBASID08 + '1' if not multiple networks)
 DamAttributes <- merge(DamAttributes, 
                  data.frame(DAMBASID08ext = str_split(seg_list, '_', simplify=T)[,2], 
                             SEGIDDAMBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
@@ -318,7 +324,7 @@ DamAttributes <- merge(DamAttributes,
 DamAttributes[is.na(DAMBASID08ext), DAMBASID08ext := paste0(DAMBASID08, 1)]
 
 
-#Compute DCI
+#------ RUN DCI ------
 DCI_L8_current <- netdams[,
                           list(DCI = DCIp_opti(
                             DamAttributes[DAMBASID08ext == HYBAS_ID08ext,
@@ -338,6 +344,7 @@ toc()
 #To add multiple scenarios, can melt DamAttributes by scenario
 #To run in parallel, could divide scenarios into 4-8 chunks and run as a foreach loop or parallel apply
 
+#------ RUN SCENARIO PERMUTATIONS ------
 #For each region, create a list scenario with all possible permutations
 Ndamsbas <- DamAttributes[ESTAGIO_1 == "Planned",.N, by=DAMBASID08]
 
