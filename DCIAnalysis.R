@@ -17,6 +17,11 @@ library(lineprof)
 library(Rcpp)
 library(stringr)
 
+require(bigstatsr)
+require(parallel)
+require(doParallel)
+
+
 #To get Rcpp to work - install RBuildTools
 # Sys.setenv(Path = paste("C:/RBuildTools/3.4/bin", Sys.getenv("Path"), sep=";"))
 # Sys.setenv(BINPREF = "C:/RBuildTools/3.4/mingw_64/bin/")
@@ -28,6 +33,12 @@ datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
 ########################################### Functions ########################################
+install.packages(file.path(rootdir, 'src/BrazilDCI_R/rccpcomb_1.0.tar.gz'), repos = NULL, type="source")
+require(rccpcomb)
+#sourceCpp(file.path(rootdir, 'src/BrazilDCI_R/combi2inds_rcpp.cpp'))
+#For putting rccp function in package, see https://www.amalag.com/armadillo/
+#Had to put it in package to run in parallel
+
 DCIp <- function(d2, d3, print = NULL){
   "d2 = a data frame containing the links between patches and passability for each link
   d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
@@ -111,27 +122,6 @@ DCIp <- function(d2, d3, print = NULL){
   #returning DCIp
   return(sum(resu))
 }
-
-#Function to get all combinations of 2 vectors (faster version of combn)
-#From https://stackoverflow.com/questions/26828301/faster-version-of-combn/26828486
-cppFunction('
-            Rcpp::DataFrame combi2inds(const Rcpp::CharacterVector inputVector){
-            const int len = inputVector.size();
-            const int retLen = len * (len-1) / 2;
-            Rcpp::IntegerVector outputVector1(retLen);
-            Rcpp::IntegerVector outputVector2(retLen);
-            int indexSkip;
-            for (int i = 0; i < len; ++i){
-            indexSkip = len * i - ((i+1) * i)/2;
-            for (int j = 0; j < len-1-i; ++j){
-            outputVector1(indexSkip+j) = i+1;
-            outputVector2(indexSkip+j) = i+j+1+1;
-            }
-            }
-            return(Rcpp::DataFrame::create(Rcpp::Named("xid") = outputVector1,
-            Rcpp::Named("yid") = outputVector2));
-            };
-            ')
 
 #DCI for potadromous species
 DCIp_opti <- function(d2, d3, print = NULL){

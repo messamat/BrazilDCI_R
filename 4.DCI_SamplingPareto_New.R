@@ -14,17 +14,24 @@ DCIfunc <- DCIp_opti
 # DCIfunc <- DCId_opti
 
 ## Choose the number of scenarios to sample
-numbScen <- 5
+numbScen <- 10
 
 ## Packages
 require(tictoc)
 require(plyr)
+require(bigstatsr)
+require(parallel)
+require(doParallel)
+require(Rcpp)
+install.packages(file.path(rootdir, 'src/BrazilDCI_R/rccpcomb_1.0.tar.gz'), repos = NULL, type="source")
+require(rccpcomb)
 
-# ## Import network and dams dataset
-# DamAttributesCrude <- read.csv("damattributes.txt", header = T)
-# NetworkBRAZILCrude <- read.csv("networkattributes.txt", header = T)
+# # Import network and dams dataset (Mathis folder structure)
+# rootdir <- find_root(has_dir("src"))
+# resdir <- file.path(rootdir, "results")
+# dcigdb <- file.path(resdir, 'dci.gdb')
 
-## Import network and dams dataset (alternative)
+# Import network and dams dataset (alternative)
 rootdir <- find_root(has_dir("PythonOutputs"))
 datadir <- file.path(rootdir, "PythonOutputs")
 dcigdb <- file.path(datadir, 'dci.gdb')
@@ -77,7 +84,8 @@ for (segnum in seq_along(coastdamSEG$HYBAS_ID08)) {
 #Assign new subbasin ID too all river segments (simply HYBAS_ID08 + '1' if not multiple networks)
 NetworkBRAZIL <- merge(NetworkBRAZIL, 
                        data.frame(HYBAS_ID08ext = str_split(seg_list, '_', simplify=T)[,2], 
-                                  SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
+                                  SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1),
+                                  stringsAsFactors = F), 
                        by='SEGIDBAS', all.x=T)
 NetworkBRAZIL[is.na(NetworkBRAZIL$HYBAS_ID08ext), "HYBAS_ID08ext"] <-  NetworkBRAZIL[is.na(NetworkBRAZIL$HYBAS_ID08ext), 
                                                                                      paste0(HYBAS_ID08, 1)]
@@ -85,7 +93,8 @@ NetworkBRAZIL[is.na(NetworkBRAZIL$HYBAS_ID08ext), "HYBAS_ID08ext"] <-  NetworkBR
 #Assign new subbasin ID too all dams (simply HYBAS_ID08 + '1' if not multiple networks)
 DamAttributesCrude <- merge(DamAttributesCrude, 
                             data.frame(HYBAS_ID08ext = str_split(seg_list, '_', simplify=T)[,2], 
-                                       SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1)), 
+                                       SEGIDBAS = substr(seg_list, 1, nchar(seg_list)-1),
+                                       stringsAsFactors = FALSE), 
                             by='SEGIDBAS', all.x=T)
 DamAttributesCrude[is.na(HYBAS_ID08ext), "HYBAS_ID08ext"] <-  DamAttributesCrude[is.na(HYBAS_ID08ext),
                                                                                  paste0(HYBAS_ID08, 1)]
@@ -100,10 +109,10 @@ NetworkBRAZIL <- NetworkBRAZIL
 
 
 # Organize the matrix based on type and stage of each dam
-levels(DamAttributes$ESTAGIO_1)[levels(DamAttributes$ESTAGIO_1) != "OperaÃ§Ã£o"] <- "Planned"
-levels(DamAttributes$ESTAGIO_1)[levels(DamAttributes$ESTAGIO_1) == "OperaÃ§Ã£o"] <- "Operation"
-levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) != "UHE"] <- "SHP"
-levels(DamAttributes$Tipo_1)[levels(DamAttributes$Tipo_1) == "UHE"] <- "LHP"
+DamAttributes$ESTAGIO_1[DamAttributes$ESTAGIO_1 != "OperaÃ§Ã£o"] <- "Planned"
+DamAttributes$ESTAGIO_1[DamAttributes$ESTAGIO_1 == "OperaÃ§Ã£o"] <- "Operation"
+DamAttributes$Tipo_1[DamAttributes$Tipo_1 != "UHE"] <- "SHP"
+DamAttributes$Tipo_1[DamAttributes$Tipo_1 == "UHE"] <- "LHP"
 
 ## Fix mistakes in the dataset
 DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "SHP" & DamAttributes$POT_KW > 30000)] <- "LHP"    #UHE Buritizal(Das Mortes), UHE Resplendor(Doce), UHE Pouso Alto (Sucuriú)
@@ -121,117 +130,108 @@ HydroFreeBasins <- as.character(resuDCI$HYBAS_ID[resuDCI$All_curr == 100])
 ## Create a vector of NAs to be filled out with DCIs of each basin
 DCIbasins <- rep(NA, times = length(basinList))
 
-## Create a matrix to be filled with the summarized national-level data (average DCIs, capacity gain)
-NationalMat <- matrix(NA, ncol = 7,  nrow = numbScen)
-colnames(NationalMat) <- c("NatAverageDCI", "AddCapacity", "NFutDams", "NFutSHP", "NFutLHP",  "NFreeDammed", "DamIDs")
-NationalScen <- as.data.frame(NationalMat)
+#Convert data frmes to data tables to speed up analysis
+DamAttributes <- as.data.table(DamAttributes)
+NetworkBRAZIL <- as.data.table(NetworkBRAZIL)
 
-## Create a vector to be filled out with permeability values (operation = 0.1 and Planned = 1)
-Permeability <- rep(NA, times = dim(DamAttributes)[1])
-Permeability[DamAttributes$ESTAGIO_1 == "Operation"] <- 0.1
-Permeability[DamAttributes$ESTAGIO_1 == "Planned"] <- 1
+DamAttributes[, `:=`(Allcurrent = ifelse(DamAttributes$ESTAGIO_1 == 'Operation', 0.1, 1),
+                     Allfuture = 1,
+                     SHPcurrent = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHPcurrent = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'LHP', 0.1, 1),
+                     SHPfuture = ifelse(DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHPfuture = ifelse(DamAttributes$Tipo_1 == 'LHP', 0.1, 1)
+)]
+
+setnames(DamAttributes, 'HYBAS_ID08ext', 'DAMBAS_ID08ext')
+
+#Compute DCI for Allcurrent scenario
+DCI_L8_current <- NetworkBRAZIL[,
+                                list(DCI = DCIfunc(
+                                  DamAttributes[DAMBAS_ID08ext == HYBAS_ID08ext,
+                                                    list(
+                                                      id1 = DownSeg,
+                                                      id2 = UpSeg,
+                                                      pass = Allcurrent
+                                                    )],
+                                  .SD[, list(id=as.character(SEGID),
+                                             l=Shape_Length)],
+                                  print = F)),
+                                by=.(HYBAS_ID08ext)]
 
 ## Get the total number of future dams
 MaxFutDams <- sum(DamAttributes$ESTAGIO_1 == "Planned")
 
 ## Create a list IDs of planned dams to be sampled
-DamID <- 1:dim(DamAttributes)[1]
-ListIDs <- DamID[DamAttributes$ESTAGIO_1 == "Planned"]
-MaxNListIDs <- length(ListIDs)
+ListIDs <- DamAttributes[ESTAGIO_1 == "Planned", 'DAMID']
+MaxNListIDs <- nrow(ListIDs)
 
+tic()
+#Get list of all scenarios
+Scens <- lapply(sample(x = 1:MaxFutDams, size = numbScen, replace=T), function(N) {
+  sample(unlist(ListIDs), N, FALSE, NULL)
+})
 
-tic("total")
-## Loop over the scenarios
-for (n in 1: numbScen){
+#Initialize parallel analysis
+cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recommended number of cores
+on.exit(stopCluster(cl))
+doParallel::registerDoParallel(cl)
+
+#Launch DCI analysis for all scenarios in parallel
+DCIscens <- foreach(i=1:numbScen, 
+                    .packages = c("data.table", "Rcpp", "rccpcomb"), 
+                    .noexport = c('combi2inds')) %dopar% {
+  scen_DAMIDlist <- Scens[[i]]
   
   ## Get the number of future dams in that scenario
-  ScenNdams <- sample(x = 1:MaxFutDams, size = 1)
-  
-  ## Sample the planned dams IDs that will get built in that scenario
-  SampledDamsIDs <- sample(x = 1:MaxNListIDs, size = ScenNdams)
-  SampledIDs <- ListIDs[SampledDamsIDs]
-  
-  ## Change the permeability value for 0.1 for the sampled dams from that scenario
-  ScenPermeability <- Permeability
-  ScenPermeability[which(DamID %in% SampledIDs)] <- 0.1
-  
-  ## Get the number of basins that will be no longer free-flowing in this given scenario
-  UniqueBasin <- as.character(unique(DamAttributes$HYBAS_ID08ext[which(DamID %in% SampledIDs)]))
-  UniqueBasinIDs <- substr(UniqueBasin, 1, nchar(basinList)-1)
-  NFreeDammed <- sum(UniqueBasinIDs %in% HydroFreeBasins)
-  
-  #### DCI Analysis for all basins inside this scenario
-  ## Loop over basins
-  for (j in 1: length(basinList)){
-    
-    ## filter attributes of the basin j         
-    BasinX <- NetworkBRAZIL[NetworkBRAZIL$HYBAS_ID08ext == basinList[j], ]
-    DamX <- DamAttributes[DamAttributes$HYBAS_ID08ext == basinList[j], ]
-    PermeabilityX <- ScenPermeability[DamAttributes$HYBAS_ID08ext == basinList[j]]
-    
-    # Create a sequence ranging from 1 to the maximum number of segments
-    # Lsegments <- min(unique(BasinX$SEGID))
-    Numbsegments <- length(unique(BasinX$SEGID))
-    
-    ## Determine that basins with no dams have DCI = 100 (for current scenarios or for just one type of hydropower)
-    if (Numbsegments == 1){
-      DCI <- 100
-    }
-    
-    ## For basins with dams, DCI is calculated below
-    if (Numbsegments > 1){
-      
-      ## Create vectors of segids and their total lenght
-      listSeg <- paste("seg", BasinX$SEGID, sep ="")
-      listLengths <- BasinX$Shape_Length
-      
-      
-      ## Compile the data on the edges for the DCI analysis for the basin j
-      DowSeg <- paste("seg", DamX$DownSeg, sep ="")
-      UpSeg <- paste("seg", DamX$UpSeg, sep ="")
-      DamPermeability <- PermeabilityX
-      
-      # EdgesData <- data.frame(DowSeg, UpSeg, Type, Situation, ID_number, ID_name, Basin, Capacity, DamPermeability)
-      EdgesData <- data.frame(DowSeg, UpSeg, DamPermeability)
-      
-      
-      ### Run the DCI analysis for the basin j
-      # attributes of edges; links between nodes
-      d2 = data.frame (id1 = EdgesData$DowSeg, id2 = EdgesData$UpSeg, pass = EdgesData$DamPermeability)
-      
-      # attributes of nodes; node sizes
-      d3 = data.frame(id = listSeg, l = listLengths)
-      
-      # Run DCI analysis for the basin
-      DCI <- DCIfunc (d2, d3, print = F)
-      
-      # Fill out with DCI values
-      DCIbasins[j] <- DCI
-      
-    }
-    
-    ## Print indexes to follow the calculations
-    print(c(n, j))
-    
-  }
-  
-  NationalScen[n, 1] <- mean(DCIbasins, na.rm = T)
-  NationalScen[n, 2] <- sum(DamAttributes$POT_KW[DamID %in% SampledIDs]/1000)
-  NationalScen[n, 3] <- ScenNdams
-  NationalScen[n, 4] <- sum(DamAttributes$Tipo_1[DamID %in% SampledIDs] == "SHP")
-  NationalScen[n, 5] <- sum(DamAttributes$Tipo_1[DamID %in% SampledIDs] == "LHP")
-  NationalScen[n, 6] <- NFreeDammed
-  NationalScen[n, 7] <- toString(SampledIDs)
-  
-}
+  ScenNdams <- length(scen_DAMIDlist)
 
+  ## Get the number of basins that will be no longer free-flowing in this given scenario
+  UniqueBasin <- unique(DamAttributes[DAMID %in% scen_DAMIDlist, DAMBAS_ID08ext])  
+  NFreeDammed <- sum(UniqueBasin %in% HydroFreeBasins)
+   
+  #Subset dam attributes to only process DCI in basins with changed dam composition
+  DamAttributesScen <- DamAttributes[DAMBAS_ID08ext %in% UniqueBasin,]
+
+  ## Change the permeability value for 0.1 for the sampled dams from that scenario (plus keep all dams from All Current scenario)
+  DamAttributesScen[DAMID %in% scen_DAMIDlist, Allcurrent := 0.1]
+
+  #### rbind DCI Analysis for all basins inside this scenario with all other basins
+  DCI_L8_ScenPlanned <- rbind(DCI_L8_current[!(HYBAS_ID08ext %in% UniqueBasin),],
+                              NetworkBRAZIL[HYBAS_ID08ext %in% UniqueBasin,
+                                            list(DCI = DCIfunc(
+                                              DamAttributesScen[DAMBAS_ID08ext == HYBAS_ID08ext,
+                                                                list(
+                                                                  id1 = DownSeg,
+                                                                  id2 = UpSeg,
+                                                                  pass = Allcurrent
+                                                                )],
+                                              .SD[, list(id=as.character(SEGID),
+                                                         l=Shape_Length)],
+                                              print = F)),
+                                            by=.(HYBAS_ID08ext)]
+  )
+
+  return(list(
+    mean(DCI_L8_ScenPlanned$DCI, na.rm = T),
+    sum(DamAttributes$POT_KW[DamAttributes$DAMID %in% scen_DAMIDlist]/1000),
+    ScenNdams,
+    sum(DamAttributes$Tipo_1[DamAttributes$DAMID %in% scen_DAMIDlist] == "SHP"),
+    sum(DamAttributes$Tipo_1[DamAttributes$DAMID %in% scen_DAMIDlist] == "LHP"),
+    NFreeDammed,
+    toString(scen_DAMIDlist))
+  )
+}
 toc()
 
+# Summarized national-level data in data.frame format (average DCIs, capacity gain)
+NationalScen <- as.data.frame(do.call("rbind", lapply(DCIscens, unlist)))
+colnames(NationalScen) <- c("NatAverageDCI", "AddCapacity", "NFutDams", "NFutSHP", "NFutLHP",  "NFreeDammed", "DamIDs")
 
 # ## Save as csv
 # write.csv(NationalScen, file = "NationalScen_DCIp.csv")
 # # write.csv(NationalScen, file = "NationalScen_DCIi.csv")
-
 
 ###########################################################################################################
 ################ Plot PARETO and select OPTIMAL and NON-OPTIMAL scenarios #################################
