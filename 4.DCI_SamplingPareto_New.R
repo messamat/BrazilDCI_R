@@ -23,7 +23,6 @@ require(bigstatsr)
 require(parallel)
 require(doParallel)
 require(Rcpp)
-install.packages(file.path(rootdir, 'src/BrazilDCI_R/rccpcomb_1.0.tar.gz'), repos = NULL, type="source")
 require(rccpcomb)
 
 # # Import network and dams dataset (Mathis folder structure)
@@ -31,7 +30,7 @@ require(rccpcomb)
 # resdir <- file.path(rootdir, "results")
 # dcigdb <- file.path(resdir, 'dci.gdb')
 
-# Import network and dams dataset (alternative)
+# # Import network and dams dataset (alternative)
 rootdir <- find_root(has_dir("PythonOutputs"))
 datadir <- file.path(rootdir, "PythonOutputs")
 dcigdb <- file.path(datadir, 'dci.gdb')
@@ -109,10 +108,8 @@ NetworkBRAZIL <- NetworkBRAZIL
 
 
 # Organize the matrix based on type and stage of each dam
-DamAttributes$ESTAGIO_1[DamAttributes$ESTAGIO_1 != "OperaÃ§Ã£o"] <- "Planned"
-DamAttributes$ESTAGIO_1[DamAttributes$ESTAGIO_1 == "OperaÃ§Ã£o"] <- "Operation"
-DamAttributes$Tipo_1[DamAttributes$Tipo_1 != "UHE"] <- "SHP"
-DamAttributes$Tipo_1[DamAttributes$Tipo_1 == "UHE"] <- "LHP"
+DamAttributes[, ESTAGIO_1 := ifelse(ESTAGIO_1 != "Operação", 'Planned', 'Operation')]
+DamAttributes[, Tipo_1 := ifelse(Tipo_1 != "UHE", "SHP", "LHP")]
 
 ## Fix mistakes in the dataset
 DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "SHP" & DamAttributes$POT_KW > 30000)] <- "LHP"    #UHE Buritizal(Das Mortes), UHE Resplendor(Doce), UHE Pouso Alto (Sucuriú)
