@@ -20,6 +20,7 @@ library(stringr)
 require(bigstatsr)
 require(parallel)
 require(doParallel)
+library(RcppAlgos)
 
 
 #To get Rcpp to work - install RBuildTools
@@ -33,12 +34,7 @@ datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
 ########################################### Functions ########################################
-install.packages(file.path(rootdir, 'src/BrazilDCI_R/rccpcomb_1.0.tar.gz'), repos = NULL, type="source")
-require(rccpcomb)
-#sourceCpp(file.path(rootdir, 'src/BrazilDCI_R/combi2inds_rcpp.cpp'))
-#For putting rccp function in package, see https://www.amalag.com/armadillo/
-#Had to put it in package to run in parallel
-
+#DCI for potadromous species
 DCIp <- function(d2, d3, print = NULL){
   "d2 = a data frame containing the links between patches and passability for each link
   d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
@@ -123,7 +119,6 @@ DCIp <- function(d2, d3, print = NULL){
   return(sum(resu))
 }
 
-#DCI for potadromous species
 DCIp_opti <- function(d2, d3, print = NULL){
   "d2 = a data frame containing the links between patches and passability for each link
   d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
@@ -160,10 +155,131 @@ DCIp_opti <- function(d2, d3, print = NULL){
   }
   
   resutri <- apply(lowertricomb, 1, DCImatp)
-  resudia <- sapply(d3$id, DCImatpself)
+  resudia <- lapply(d3$id, DCImatpself)
   #Compute DCI by sum connectivity for full matrix of pairwise combination 
-  return(sum(resutri)*2+sum(resudia))
+  return(sum(resutri)*2+sum(unlist(resudia)))
 }
+
+DCIp_opti2 <- function(d2, d3, print = NULL){
+  "d2 = a data frame containing the links between patches and passability for each link
+  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
+  d2$id2 = final segment (to) connection; MUST BE FACTOR!
+  d2$pass = the passability from one segment to the next
+  
+  d3 = data frame containing all segments and its respective sizes
+  d3$id = the ID of each segment; MUST BE FACTOR!
+  d3$l = the SIZE of segments formed by barriers within a given river
+  
+  OBS: d2 and d3 must have the same segment names (ID)
+  d = edges; vertices = nodes"
+  
+  require(igraph)
+  
+  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  
+  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
+  d3[,l_L := l/sum(l)]
+  
+  #Get lower triangle of matrix of all pairwise combination of segments
+  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% setDT %>% setnames(c('V1', 'V2'), c('i', 'k'))
+  
+  DCImatp <- function(x) {
+    #Compute connectivity for all unique pairs of segments in basin (for potadromous species)
+    return(prod(shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass)*
+             prod(d3[d3$id==x[1],'l_L'], d3[d3$id==x[2],'l_L']) *
+             100)
+  }
+  resutri <- apply(lowertricomb, 1, DCImatp)
+  
+  #Compute DCI by sum connectivity for full matrix of pairwise combination 
+  return(sum(resutri)*2+d3[,100*sum(l_L^2)])
+}
+
+DCIp_opti3 <- function(d2, d3, print = NULL){
+  "d2 = a data frame containing the links between patches and passability for each link
+  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
+  d2$id2 = final segment (to) connection; MUST BE FACTOR!
+  d2$pass = the passability from one segment to the next
+  
+  d3 = data frame containing all segments and its respective sizes
+  d3$id = the ID of each segment; MUST BE FACTOR!
+  d3$l = the SIZE of segments formed by barriers within a given river
+  
+  OBS: d2 and d3 must have the same segment names (ID)
+  d = edges; vertices = nodes"
+  
+  require(igraph)
+  
+  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  
+  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
+  d3[,l_L := l/sum(l)]
+  
+  #Get lower triangle of matrix of all pairwise combination of segments
+  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
+    merge(d3, by.x='i', by.y='id', all.y=F) %>%
+    merge(d3, by.x='k', by.y='id', all.y=F) %>%
+    .[, 100 * l_L.x * l_L.y * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass),
+      by=seq_len(nrow(.))]
+  
+  #Compute DCI by sum connectivity for full matrix of pairwise combination 
+  return(lowertricomb[, 2*sum(V1)]+d3[,100*sum(l_L^2)])
+}
+
+
+DCIp_opti4 <- function(d2, d3, print = NULL){
+  "d2 = a data frame containing the links between patches and passability for each link
+  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
+  d2$id2 = final segment (to) connection; MUST BE FACTOR!
+  d2$pass = the passability from one segment to the next
+  
+  d3 = data frame containing all segments and its respective sizes
+  d3$id = the ID of each segment; MUST BE FACTOR!
+  d3$l = the SIZE of segments formed by barriers within a given river
+  
+  OBS: d2 and d3 must have the same segment names (ID)
+  d = edges; vertices = nodes"
+  
+  require(igraph)
+  
+  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  
+  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
+  d3[,l_L := l/sum(l)]
+  
+  #Get lower triangle of matrix of all pairwise combination of segments
+  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
+    merge(d3, by.x='i', by.y='id', all.y=F) %>%
+    merge(d3, by.x='k', by.y='id', all.y=F) 
+  
+  lowercomp <- unlist(lapply(lowertricomb[, unique(i)], function(c) {
+    lowertricomb4[i==c, 100 * l_L.x * l_L.y] *
+      unlist(
+        lapply(shortest_paths(graph, from = c, to = lowertricomb[i==c,k], output = "epath")$epath, function(epath) {
+          prod(epath$pass)
+        })
+      )
+  })) 
+  
+  #Compute DCI by sum connectivity for full matrix of pairwise combination 
+  return(2*sum(lowercomp)+d3[,100*sum(l_L^2)])
+}
+
+d3 <- NetworkBRAZIL[HYBAS_ID08ext == '60808065901', list(id=as.character(SEGID), l=Shape_Length)]
+d2 <- DamAttributes[DAMBAS_ID08ext == '60808065901',list(
+  id1 = DownSeg,
+  id2 = UpSeg,
+  pass = Allcurrent)]
+
+
+microbenchmark(DCIp(d2, d3, print=F), 
+               DCIp_opti(d2, d3, print=F),
+               DCIp_opti2(d2, d3, print=F), 
+               DCIp_opti3(d2, d3, print=F),
+               DCIp_opti4(d2, d3, print=F),
+               times=50)
+
+#DCIp_opti4=DCIp_opti3 < DCIp_opti2 < DCIp_opti1 < DCIp
 
 #DCI for diadromous species
 #Calculate connectivity in terms of the probability that a fish can move in both directions between 

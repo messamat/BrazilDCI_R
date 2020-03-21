@@ -17,14 +17,16 @@ DCIfunc <- DCIp_opti
 require(tictoc)
 require(plyr)
 
-# ## Import network and dams dataset
-# DamAttributesCrude <- read.csv("damattributes.txt", header = T)
-# NetworkBRAZILCrude <- read.csv("networkattributes.txt", header = T)
+# Import network and dams dataset (Mathis folder structure)
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+dcigdb <- file.path(resdir, 'dci.gdb')
+
 
 ## Import network and dams dataset (alternative)
-rootdir <- find_root(has_dir("PythonOutputs"))
-datadir <- file.path(rootdir, "PythonOutputs")
-dcigdb <- file.path(datadir, 'dci.gdb')
+# rootdir <- find_root(has_dir("PythonOutputs"))
+# datadir <- file.path(rootdir, "PythonOutputs")
+# dcigdb <- file.path(datadir, 'dci.gdb')
 NetworkBRAZILCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 DamAttributesCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
 
@@ -91,6 +93,8 @@ DamAttributesCrude[is.na(HYBAS_ID08ext), "HYBAS_ID08ext"] <-  DamAttributesCrude
 DamAttributesCrude <- DamAttributesCrude[-which(DamAttributesCrude$HYBAS_ID08 == 6080595090),]
 NetworkBRAZIL <- NetworkBRAZIL[-which(NetworkBRAZIL$HYBAS_ID08 == 6080595090),]
 
+
+#------ FORMAT DATA ------
 ## Final Dataframes to run DCI analyses
 DamAttributes <- DamAttributesCrude
 NetworkBRAZIL <- NetworkBRAZIL
@@ -106,6 +110,35 @@ DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "SHP" & DamAttributes$POT_KW 
 DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "LHP" & DamAttributes$POT_KW < 30000 &
                              DamAttributes$AREA_NA_MA < 13.0 & DamAttributes$ESTAGIO_1 == "Planned")] <- "SHP"   #Keep old dams as UHEs and new ones as SHPs
 
+setnames(DamAttributes, 'HYBAS_ID08ext', 'DAMBASID08ext')
+
+DamAttributes[, `:=`(All_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation', 0.1, 1),
+                     All_future = 1,
+                     SHP_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHP_current = ifelse(DamAttributes$ESTAGIO_1 == 'Operation' & 
+                                            DamAttributes$Tipo_1 == 'LHP', 0.1, 1),
+                     SHP_future = ifelse(DamAttributes$Tipo_1 == 'SHP', 0.1, 1),
+                     LHP_future = ifelse(DamAttributes$Tipo_1 == 'LHP', 0.1, 1)
+)]
+
+tic()
+DCI_L8_current <- NetworkBRAZIL[,
+                          list(DCI = DCIp_opti(
+                            DamAttributes[DAMBASID08ext == HYBAS_ID08ext,
+                                          list(
+                                            id1 = DownSeg,
+                                            id2 = UpSeg,
+                                            pass = All_current
+                                          )],
+                            .SD[, list(id=as.character(SEGID),
+                                       l=Shape_Length)],
+                            print = F)),
+                          by=.(HYBAS_ID08ext)]
+toc()
+
+
+tic()
 ## Create a vector with unique basin IDs
 basinList <- as.character(unique(DamAttributes$HYBAS_ID08ext))
 
@@ -136,7 +169,7 @@ All <- c("SHP", "LHP")
 ScenarioSituation <- c("Current", "Future", "Current", "Future", "Current", "Future")
 ScenarioType <- c("All", "All", "Small", "Small", "Large", "Large")
 
-tic("total")
+#tic("total")
 ## Loop over scenarios
 for (x in 1: 6){
   

@@ -14,7 +14,7 @@ DCIfunc <- DCIp_opti
 # DCIfunc <- DCId_opti
 
 ## Choose the number of scenarios to sample
-numbScen <- 10
+numbScen <- 100
 
 ## Packages
 require(tictoc)
@@ -26,14 +26,14 @@ require(Rcpp)
 require(rccpcomb)
 
 # # Import network and dams dataset (Mathis folder structure)
-# rootdir <- find_root(has_dir("src"))
-# resdir <- file.path(rootdir, "results")
-# dcigdb <- file.path(resdir, 'dci.gdb')
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+dcigdb <- file.path(resdir, 'dci.gdb')
 
 # # Import network and dams dataset (alternative)
-rootdir <- find_root(has_dir("PythonOutputs"))
-datadir <- file.path(rootdir, "PythonOutputs")
-dcigdb <- file.path(datadir, 'dci.gdb')
+# rootdir <- find_root(has_dir("PythonOutputs"))
+# datadir <- file.path(rootdir, "PythonOutputs")
+# dcigdb <- file.path(datadir, 'dci.gdb')
 NetworkBRAZILCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 DamAttributesCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
 
@@ -102,14 +102,16 @@ DamAttributesCrude[is.na(HYBAS_ID08ext), "HYBAS_ID08ext"] <-  DamAttributesCrude
 DamAttributesCrude <- DamAttributesCrude[-which(DamAttributesCrude$HYBAS_ID08 == 6080595090),]
 NetworkBRAZIL <- NetworkBRAZIL[-which(NetworkBRAZIL$HYBAS_ID08 == 6080595090),]
 
+#------ FORMAT DATA ------
 ## Final Dataframes to run DCI analyses
 DamAttributes <- DamAttributesCrude
 NetworkBRAZIL <- NetworkBRAZIL                     
 
 
 # Organize the matrix based on type and stage of each dam
-DamAttributes[, ESTAGIO_1 := ifelse(ESTAGIO_1 != "Operação", 'Planned', 'Operation')]
+DamAttributes[, ESTAGIO_1 := ifelse(ESTAGIO_1 != "OperaÃ§Ã£o", 'Planned', 'Operation')]
 DamAttributes[, Tipo_1 := ifelse(Tipo_1 != "UHE", "SHP", "LHP")]
+
 
 ## Fix mistakes in the dataset
 DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "SHP" & DamAttributes$POT_KW > 30000)] <- "LHP"    #UHE Buritizal(Das Mortes), UHE Resplendor(Doce), UHE Pouso Alto (Sucuriú)
@@ -145,17 +147,17 @@ setnames(DamAttributes, 'HYBAS_ID08ext', 'DAMBAS_ID08ext')
 
 #Compute DCI for Allcurrent scenario
 DCI_L8_current <- NetworkBRAZIL[,
-                                list(DCI = DCIfunc(
-                                  DamAttributes[DAMBAS_ID08ext == HYBAS_ID08ext,
+                                list(DCI = DCIp_opti(
+                                  d2= DamAttributes[DAMBAS_ID08ext == HYBAS_ID08ext,
                                                     list(
                                                       id1 = DownSeg,
                                                       id2 = UpSeg,
-                                                      pass = Allcurrent
-                                                    )],
-                                  .SD[, list(id=as.character(SEGID),
-                                             l=Shape_Length)],
+                                                      pass = Allcurrent)],
+                                  d3 = .SD[, list(id=as.character(SEGID),
+                                                  l=Shape_Length)],
                                   print = F)),
                                 by=.(HYBAS_ID08ext)]
+
 
 ## Get the total number of future dams
 MaxFutDams <- sum(DamAttributes$ESTAGIO_1 == "Planned")
