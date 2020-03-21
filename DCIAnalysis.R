@@ -265,22 +265,6 @@ DCIp_opti4 <- function(d2, d3, print = NULL){
   return(2*sum(lowercomp)+d3[,100*sum(l_L^2)])
 }
 
-d3 <- NetworkBRAZIL[HYBAS_ID08ext == '60808065901', list(id=as.character(SEGID), l=Shape_Length)]
-d2 <- DamAttributes[DAMBAS_ID08ext == '60808065901',list(
-  id1 = DownSeg,
-  id2 = UpSeg,
-  pass = Allcurrent)]
-
-
-microbenchmark(DCIp(d2, d3, print=F), 
-               DCIp_opti(d2, d3, print=F),
-               DCIp_opti2(d2, d3, print=F), 
-               DCIp_opti3(d2, d3, print=F),
-               DCIp_opti4(d2, d3, print=F),
-               times=50)
-
-#DCIp_opti4=DCIp_opti3 < DCIp_opti2 < DCIp_opti1 < DCIp
-
 #DCI for diadromous species
 #Calculate connectivity in terms of the probability that a fish can move in both directions between 
 #the mouth of the river and another section of the river network
