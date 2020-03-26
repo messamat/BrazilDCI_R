@@ -47,11 +47,6 @@ basinList <- DamAttributes[ESTAGIO_1 == "Planned", .N, by=DAMBAS_ID08ext] %>%
   setorder(N) %>% 
   .[,DAMBAS_ID08ext]
 
-## Make a vector of basins that are currently free of hydropower
-resuDCI <- as.data.frame(fread("DCI_Brazil_L8_DCIp.csv", header = T))
-HydroFreeBasins <- as.character(resuDCI$HYBAS_ID[resuDCI$All_curr == 100])
-
-
 #Compute DCI for Allcurrent scenario
 DCI_L8_current <- NetworkBRAZIL[,
                                 list(DCI = DCIfunc(
@@ -75,17 +70,23 @@ sum(log10(basinpermutlen$V1)) #Total number of possible portfolios in brazil 10^
 
 #Import scenarios with 0 dams
 outdir_permut = file.path(resdir, 'outpermut_basins')
-allscens <- lapply(file.path(outdir_permut, list.files(outdir_permut)), 
-                   function(x) read.fst(x, columns = c("scenbasin", "DAMBAS_ID08ext", "ndams", "POT_KWbasin", "SHPnum", "LHPnum",
-                                                       "prevfree", "DCI"))) %>%
-  do.call(rbind, .) %>%
-  setDT
+allscens <- lapply(file.path(outdir_permut, list.files(outdir_permut)), read.fst) %>% #Read all scenarios for each basin
+  do.call(rbind, .) %>% #Join them together
+  setDT %>%
+  .[!is.na(DamIDs), DamIDs := toString(sort(str_split(string=DamIDs, pattern='[,]\\s*',simplify=T))), #Order dam names
+    by=.(scenbasin, DAMBAS_ID08ext)]
 
-#Add scenario with no new dam
-nbasins <- allscens[, length(unique(DAMBAS_ID08ext))]
+
+#First sample number of dams, then sample dams
+Scens <- lapply(sample(x = 1:MaxFutDams, size = numbScen, replace=T), function(N) {
+  sample(unlist(ListIDs), N, FALSE, NULL)
+})
+
+
+
 
 #Generate 100,000 basin-specific scenarios and then compute statistics over them
-nsamp=10000
+nsamp=100000
 tic()
 check <- replicate(n=10, simplify=FALSE,
                    exp = 
@@ -102,7 +103,7 @@ check <- replicate(n=10, simplify=FALSE,
   setDT
 toc()
   
-
+toString(DAMID)
 
 
 
@@ -131,10 +132,7 @@ dummyscens
 
 
 #####################################################################################
-#Get list of all scenarios
-Scens <- lapply(sample(x = 1:MaxFutDams, size = numbScen, replace=T), function(N) {
-  sample(unlist(ListIDs), N, FALSE, NULL)
-})
+
 
 #Initialize parallel analysis
 cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recommended number of cores
