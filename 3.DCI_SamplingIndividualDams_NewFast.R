@@ -100,13 +100,6 @@ DCIscens <- foreach(j=basinList, #basinList, ## Loop over basins
                       #Was this basin free flowing before?
                       prevfreebas <- DamX[ESTAGIO_1=='Operation', .N]==0
                       
-                      # #Create progress bar for long processes
-                      # if (length(DAMIDvec) > minlazy) {
-                      #   mypb <- tkProgressBar(title = "R progress bar", label = "",
-                      #                         min = 0, max = 1, initial = 0, width = 300)
-                      #   setTkProgressBar(mypb, 1, title = j, label = NULL)
-                      # }
-                      
                       #Get all permutation scenarios
                       if(length(DAMIDvec) <= minlazy) {
                         #Create all combinations of future dams permeabilities
@@ -189,9 +182,6 @@ DCIscens <- foreach(j=basinList, #basinList, ## Loop over basins
                       colnames(DCIdiffstats) <- c("DAMID", "DCIMeanDiff", "DCIUppLim", "DCIDownLim", "DCIUpCI", "DCIDownCI", "Nscenarios",
                                                   "Type", "Situation", "Capacity","Name", "Basin")
 
-                      #Close progress bar
-                      #if (length(DAMIDvec) >= minlazy) {close(mypb)}
-                      
                       return(DCIdiffstats)
                     }
 stopCluster(cl)
