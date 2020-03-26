@@ -23,25 +23,29 @@ require(bigstatsr)
 require(parallel)
 require(doParallel)
 require(Rcpp)
-require(rccpcomb)
+library(fst)
+devtools::source_gist("https://gist.github.com/r2evans/e5531cbab8cf421d14ed", filename = "lazyExpandGrid.R") #Get expand.grid version that won't run out of memory when > 25 dams
+
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
+outdir_permut = file.path(resdir, 'outpermut_basins')
 
 # # Import network and dams dataset (alternative)
 # rootdir <- find_root(has_dir("PythonOutputs"))
 # datadir <- file.path(rootdir, "PythonOutputs")
 # dcigdb <- file.path(datadir, 'dci.gdb')
-NetworkBRAZILCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
-DamAttributesCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
 
-## Remove the dams that have NAs from the dataset
-DamAttributesCrude <- DamAttributesCrude[!is.na(DamAttributesCrude$HYBAS_ID08),]
+#Import formatted data
+DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
+NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
 ## Create a vector with unique basin IDs
-basinList <- as.character(unique(DamAttributes$HYBAS_ID08ext))
+basinList <- DamAttributes[ESTAGIO_1 == "Planned", .N, by=DAMBAS_ID08ext] %>% 
+  setorder(N) %>% 
+  .[,DAMBAS_ID08ext]
 
 ## Make a vector of basins that are currently free of hydropower
 resuDCI <- as.data.frame(fread("DCI_Brazil_L8_DCIp.csv", header = T))
@@ -50,7 +54,7 @@ HydroFreeBasins <- as.character(resuDCI$HYBAS_ID[resuDCI$All_curr == 100])
 
 #Compute DCI for Allcurrent scenario
 DCI_L8_current <- NetworkBRAZIL[,
-                                list(DCI = DCIp_opti(
+                                list(DCI = DCIfunc(
                                   d2= DamAttributes[DAMBAS_ID08ext == HYBAS_ID08ext,
                                                     list(
                                                       id1 = DownSeg,
@@ -65,11 +69,86 @@ DCI_L8_current <- NetworkBRAZIL[,
 ## Get the total number of future dams
 MaxFutDams <- sum(DamAttributes$ESTAGIO_1 == "Planned")
 
-## Create a list IDs of planned dams to be sampled
-ListIDs <- DamAttributes[ESTAGIO_1 == "Planned", 'DAMID']
-MaxNListIDs <- nrow(ListIDs)
+## Get the total number of possible portfolios for each basin
+basinpermutlen <- DamAttributes[ESTAGIO_1 == "Planned", 2^(.N), by=DAMBAS_ID08ext]
+sum(log10(basinpermutlen$V1)) #Total number of possible portfolios in brazil 10^682
 
+#Import scenarios with 0 dams
+outdir_permut = file.path(resdir, 'outpermut_basins')
+allscens <- lapply(file.path(outdir_permut, list.files(outdir_permut)), 
+                   function(x) read.fst(x, columns = c("scenbasin", "DAMBAS_ID08ext", "ndams", "POT_KWbasin", "SHPnum", "LHPnum",
+                                                       "prevfree", "DCI"))) %>%
+  do.call(rbind, .) %>%
+  setDT
+
+#Import scenarios with 0 dams
+outdir_permut = file.path(resdir, 'outpermut_basins2')
+allscens2 <- lapply(file.path(outdir_permut, list.files(outdir_permut)), 
+                   function(x) read.fst(x, columns = c("scenbasin", "DAMBAS_ID08ext", "ndams", "POT_KWbasin", "SHPnum", "LHPnum",
+                                                       "prevfree","DCI"))) %>%
+  do.call(rbind, .) %>%
+  setDT
+
+allscens <- allscens[, .(scenbasin, DAMBAS_ID08ext, DCI)][
+  allscens2[, .(scenbasin, DAMBAS_ID08ext, ndams, POT_KWbasin, SHPnum, LHPnum, prevfree), ],
+  on=.(scenbasin, DAMBAS_ID08ext)]
+
+for (j in unique(allscens$DAMBAS_ID08ext)) {
+  print(j)
+  write.fst(allscens[DAMBAS_ID08ext == j,], file.path(outdir_permut, paste0('permut_', j, '.fst')))
+}
+
+
+#Add scenario with no new dam
+nbasins <- allscens[, length(unique(DAMBAS_ID08ext))]
+
+#Generate 100,000 basin-specific scenarios and then compute statistics over them
+nsamp=10000
 tic()
+check <- replicate(n=10, simplify=FALSE,
+                   exp = 
+                     DCIportfolio <- allscens[, .SD[sample(.N, nsamp, replace=T)], by=DAMBAS_ID08ext] %>%
+                     .[, brazilscen := rep(1:nsamp, nbasins)] %>% 
+                     .[, list(NatAverageDCI = mean(DCI),
+                              AddCapacity = sum(POT_KWbasin),
+                              NFutDams = sum(ndams), 
+                              NFutSHP = sum(SHPnum),
+                              NFutLHP = sum(LHPnum),
+                              NFreeDammed = sum(prevfree, na.rm=T)
+                     ), by=brazilscen]) %>%
+  do.call(rbind, .) %>%
+  setDT
+toc()
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Generate dummy dt
+dummyscens <- DamAttributes[ESTAGIO_1 == "Planned", .(scenbasin=seq(1,2^(.N)), 
+                                                      DCI=runif(2^(.N)),
+                                                      ndams=.N/2, #nnew dams
+                                                      POT_KWbasin = .N/2*1000,
+                                                      SHPnum = .N/3,
+                                                      LHPnum = .N*2/3,
+                                                      prevfree = 1),
+                            by=DAMBAS_ID08ext]
+dummyscens
+
+
+
+
+#####################################################################################
 #Get list of all scenarios
 Scens <- lapply(sample(x = 1:MaxFutDams, size = numbScen, replace=T), function(N) {
   sample(unlist(ListIDs), N, FALSE, NULL)

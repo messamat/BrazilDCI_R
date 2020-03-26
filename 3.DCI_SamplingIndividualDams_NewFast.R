@@ -43,10 +43,12 @@ dcigdb <- file.path(resdir, 'dci.gdb')
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
 NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
-
-## Remove the dams that have NAs from the dataset
-DamAttributesCrude <- DamAttributesCrude[!is.na(DamAttributesCrude$HYBAS_ID08),]
-
+#Create output directory
+outdir_permut = file.path(resdir, 'outpermut_basins')
+if (!dir.exists(outdir_permut)) {
+  print(paste0('Create ', outdir_permut, '...'))
+  dir.create(outdir_permut)
+}
 
 #------ FORMAT DATA ------
 #Estimate number of iterations required to process all dams
@@ -63,7 +65,7 @@ ggplot(permuttable, aes(x=ndams, y=cumpermut)) +
   scale_y_log10()
 
 ## Create a vector with unique basin IDs
-basinList <- DamAttributes[, .N, by=DAMBAS_ID08ext] %>% 
+basinList <- DamAttributes[ESTAGIO_1 == "Planned", .N, by=DAMBAS_ID08ext] %>% 
   setorder(N) %>% 
   .[,DAMBAS_ID08ext]
 
@@ -86,22 +88,24 @@ cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recomm
 on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
-#60808065901 has 17 dams
-DCIscens <- foreach(j=basinList, ## Loop over basins
-                    .packages = c("data.table", "Rcpp", "RcppAlgos", "magrittr", 'plyr','tcltk')) %dopar% {
+#60808111301 has 22 planned dams
+DCIscens <- foreach(j=basinList, #basinList, ## Loop over basins
+                    .packages = c("data.table", "Rcpp", "RcppAlgos", "magrittr", 'plyr','tcltk', 'fst')) %dopar% {
                       
                       ## filter attributes of the basin j         
                       NetX <- NetworkBRAZIL[HYBAS_ID08ext == j, ]
-                      DamX <- DamAttributes[DAMBAS_ID08ext == j, ]       
+                      DamX <- DamAttributes[DAMBAS_ID08ext == j, ]
                       DAMIDvec <- as.character(DamX[ESTAGIO_1 == "Planned", DAMID])
                       
-                      #Create progress bar for long processes
-                      if (length(DAMIDvec) > minlazy) {
-                        mypb <- tkProgressBar(title = "R progress bar", label = "",
-                                              min = 0, max = 1, initial = 0, width = 300)
-                        setTkProgressBar(mypb, 1, title = j, label = NULL)
-                      }
+                      #Was this basin free flowing before?
+                      prevfreebas <- DamX[ESTAGIO_1=='Operation', .N]==0
                       
+                      # #Create progress bar for long processes
+                      # if (length(DAMIDvec) > minlazy) {
+                      #   mypb <- tkProgressBar(title = "R progress bar", label = "",
+                      #                         min = 0, max = 1, initial = 0, width = 300)
+                      #   setTkProgressBar(mypb, 1, title = j, label = NULL)
+                      # }
                       
                       #Get all permutation scenarios
                       if(length(DAMIDvec) <= minlazy) {
@@ -113,7 +117,7 @@ DCIscens <- foreach(j=basinList, ## Loop over basins
                         permut[, as.character(DamX[ESTAGIO_1 == "Operation", as.character(DAMID)]) := 0.1]
                         
                       } else { #If > minlazy dams, the number of possible permutations leads to memory errors
-                        permutlazy <- DamX[ESTAGIO_1 == "Planned", do.call(lazyExpandGrid, rep(list(c(0.1, 1)), .N))] #Get lazy permutation
+                        permutlazy <- DamX[ESTAGIO_1 == "Planned", do.call(lazyExpandGrid, rep(list(c(0.1, 1)), .N))] #Get lazy permutation — the equivalent of expand.grid but for cases where there are too many possibilities to efficiently/possiblthold in memory
                         permutsample <- as.data.table(permutlazy$nextItems(sample(permutlazy$n, size=nsamples))) #Sample 10000 permutations
                         colnames(permutsample) <- DAMIDvec
                         #For each dam, select all scenarios where dam is absent and create paired scenario where all other dams are unchanged, but dam is present
@@ -130,21 +134,34 @@ DCIscens <- foreach(j=basinList, ## Loop over basins
                       
                       #Melt and assign all combinations to a given basin-scenario ID to run with data.table
                       scenarios_reg <- melt(cbind(permut, 
-                                                  DAMBAS_ID08ext_scenario = paste(j, seq_len(nrow(permut)), sep='_')), 
-                                            id.var="DAMBAS_ID08ext_scenario") %>%
+                                                  scenbasin = seq_len(nrow(permut))), 
+                                            id.var="scenbasin") %>%
                         setnames('variable', 'DAMID') %>%
-                        merge(DamX[, .(DAMID, DownSeg, UpSeg)], by='DAMID', allow.cartesian=F)
+                        merge(DamX[, .(DAMID, DownSeg, UpSeg, Tipo_1, POT_KW, ESTAGIO_1)], 
+                              by='DAMID', allow.cartesian=F)
                       
                       #Run DCI for each scenario
-                      DCIX<- scenarios_reg[, 
-                                           list(DCI = DCIfunc(
-                                             d3=NetX[, list(id=as.character(SEGID),
-                                                            l=Shape_Length)],
-                                             d2=.SD[, list(id1 = DownSeg,
-                                                           id2 = UpSeg,
-                                                           pass = value)],
-                                             print = F)),
-                                           by=.(DAMBAS_ID08ext_scenario)]
+                      # DCIX<- scenarios_reg[, 
+                      #                      list(DCI = DCIfunc(d3=NetX[, list(id=as.character(SEGID), l=Shape_Length)],
+                      #                                         d2=.SD[, list(id1 = DownSeg, id2 = UpSeg, pass = value)],
+                      #                                         print = F)),
+                      #                      by=.(scenbasin)]
+                      DCIX <- scenarios_reg[, list(DCI=round(100*runif(1))), by=.(scenbasin)]
+                      
+                      #Get statistics on scenario for portfolio analysis
+                      scenarios_reg[ESTAGIO_1=='Planned' & value==0.1,
+                                    list(DAMBAS_ID08ext=j,
+                                         ndams=.N,
+                                         POT_KWbasin = sum(POT_KW/1000),
+                                         SHPnum = sum(Tipo_1=='SHP'),
+                                         LHPnum = sum(Tipo_1=='LHP'),
+                                         DamIDs = toString(DAMID),
+                                         prevfree = prevfreebas),
+                                    by=.(scenbasin)] %>%
+                        merge(DCIX[, DAMBAS_ID08ext := j], on='scenbasin', all.y=T) %>%
+                        .[is.na(ndams), `:=`(ndams=0, POT_KWbasin=0, SHPnum=0, LHPnum=0)] %>%
+                        write.fst(file.path(outdir_permut, paste0('permut_', j, '.fst')))
+                      
                       #For each dam, get DCI diff for all scenarios with and without it (could replace ldply with a data.table solution -TBD)
                       #This just orders rows for each dam's permeability value in the scenario grid and then divides the output array in two (by rows)
                       #The first half of the rows have passability = 0.1 for the ordered dam, the second half has pasability =1
@@ -174,12 +191,13 @@ DCIscens <- foreach(j=basinList, ## Loop over basins
                                                   "Type", "Situation", "Capacity","Name", "Basin")
 
                       #Close progress bar
-                      if (length(DAMIDvec) >= minlazy) {close(mypb)}
+                      #if (length(DAMIDvec) >= minlazy) {close(mypb)}
                       
                       return(DCIdiffstats)
                     }
+stopCluster(cl)
 toc()
 big_data <- as.data.table(do.call("rbind", DCIscens))
 
 #Write big_data to fst
-write.fst(big_data, file.path(resdir, 'big_data.fst'))
+write.fst(big_data, file.path(resdir, paste0('SamplingIndividualDams_results',Sys.Date(), '.fst')))
