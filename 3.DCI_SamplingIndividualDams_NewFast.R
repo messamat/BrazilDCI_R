@@ -10,11 +10,6 @@
 ###########################################################################################################
 #If run into memoery errors: see https://stackoverflow.com/questions/51248293/error-vector-memory-exhausted-limit-reached-r-3-5-0-macos
 
-
-## Choose what type of DCI function to run (DCIp or DCIi)
-DCIfunc <- DCIp_opti3
-# DCIfunc <- DCId_opti
-
 ## Packages
 require(fst)
 require(tictoc)
@@ -23,11 +18,9 @@ require(bigstatsr)
 require(parallel)
 require(doParallel)
 require(Rcpp)
-require(rccpcomb)
 require(devtools)
 devtools::source_gist("https://gist.github.com/r2evans/e5531cbab8cf421d14ed", filename = "lazyExpandGrid.R") #Get expand.grid version that won't run out of memory when > 25 dams
 require(ggplot2)
-library(tcltk)
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
@@ -36,7 +29,7 @@ dcigdb <- file.path(resdir, 'dci.gdb')
 
 #Source functions
 source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
-DCIfunc <- DCIp_opti3 ## Choose what type of DCI function to run (DCIp or DCIi)
+DCIfunc <- DCIp_opti5 ## Choose what type of DCI function to run (DCIp or DCIi)
 
 ## Import network and dams dataset (alternative)
 # rootdir <- find_root(has_dir("PythonOutputs"))

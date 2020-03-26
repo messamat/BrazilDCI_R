@@ -25,7 +25,7 @@ dcigdb <- file.path(resdir, 'dci.gdb')
 
 #Source functions
 source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
-DCIfunc <- DCIp_opti3 ## Choose what type of DCI function to run (DCIp or DCIi)
+DCIfunc <- DCIp_opti5 ## Choose what type of DCI function to run (DCIp or DCIi)
 
 #Import formatted data
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT

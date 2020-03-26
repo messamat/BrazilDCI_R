@@ -12,9 +12,6 @@ resdir <- file.path(rootdir, "results")
 datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
-#Source functions
-source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
-
 ## Import network and dams dataset (alternative)
 # rootdir <- find_root(has_dir("PythonOutputs"))
 # datadir <- file.path(rootdir, "PythonOutputs")
@@ -84,7 +81,6 @@ DamAttributesCrude[is.na(HYBAS_ID08ext), "HYBAS_ID08ext"] <-  DamAttributesCrude
 ## Remove a basin with problems (Probably the dam is too close to the upstream edge)
 DamAttributesCrude <- DamAttributesCrude[-which(DamAttributesCrude$HYBAS_ID08 == 6080595090),]
 NetworkBRAZIL <- NetworkBRAZIL[-which(NetworkBRAZIL$HYBAS_ID08 == 6080595090),]
-
 
 #------ FORMAT DATA ------
 ## Final Dataframes to run DCI analyses

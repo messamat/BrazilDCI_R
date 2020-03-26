@@ -53,6 +53,48 @@ DCIp_opti3 <- function(d2, d3, print = NULL){
   return(lowertricomb[, 2*sum(V1)]+d3[,100*sum(l_L^2)]) #Sum DCI across matrix of pairwise combinations of segments (2*lower triangle + diagonal)
 }
 
+DCIp_opti5 <- function(d2, d3, print = NULL){
+  "d2 = a data frame containing the links between patches and passability for each link
+  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
+  d2$id2 = final segment (to) connection; MUST BE FACTOR!
+  d2$pass = the passability from one segment to the next
+  
+  d3 = data frame containing all segments and its respective sizes
+  d3$id = the ID of each segment; MUST BE FACTOR!
+  d3$l = the SIZE of segments formed by barriers within a given river
+  
+  OBS: d2 and d3 must have the same segment names (ID)
+  d = edges; vertices = nodes"
+  
+  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  
+  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
+  d3[,l_L := l/sum(l)] %>%
+    setkey(id)
+  
+  #Get pair-wise DCI for lower triangle of matrix of all pairwise combination of segments (excluding diagonal)
+  if (max(d2$pass, na.rm=T) == 0) {
+    lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
+      setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
+      setkey(i) %>%  .[d3] %>%
+      setkey(k) %>%  .[d3] %>%
+      .[!is.na(i), 
+        100 * l_L * i.l_L * 0, #Compute DCI from each segment i to all other segments using 0 passability
+        by=.I]
+  } else {
+    lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
+      setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
+      setkey(i) %>%  .[d3] %>%
+      setkey(k) %>%  .[d3] %>%
+      .[!is.na(i), 
+        100 * l_L * i.l_L * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
+        by=.I]
+  }
+  
+  #Compute DCI by sum connectivity for full matrix of pairwise combination 
+  return(lowertricomb[, 2*sum(V1)]+d3[,100*sum(l_L^2)]) #Sum DCI across matrix of pairwise combinations of segments (2*lower triangle + diagonal)
+}
+
 #DCI for diadromous species
 #Calculate connectivity in terms of the probability that a fish can move in both directions between 
 #the mouth of the river and another section of the river network
@@ -98,31 +140,20 @@ DCId_opti <- function(d2, d3, print = NULL){
 ##########################
 # For troubleshooting
 ##########################
-library(rprojroot)
-library(microbenchmark)
-rootdir <- find_root(has_dir("src"))
-resdir <- file.path(rootdir, "results")
-dcigdb <- file.path(resdir, 'dci.gdb')
-DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
-NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
-
-j <- '60808111301'
-d3 <- NetworkBRAZIL[HYBAS_ID08ext==j, list(id=as.character(SEGID), l=Shape_Length)]
-d2 <-  DamAttributes[DAMBAS_ID08ext ==j, list(id1 = DownSeg, id2 = UpSeg, pass = Allcurrent)]
-
-
-microbenchmark(
-  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
-    setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>% #Convert to data.table and rename columns
-    merge(d3, by.x='i', by.y='id', all.y=F) %>% #Get size of segments (may be sped up with key-based match)
-    merge(d3, by.x='k', by.y='id', all.y=F) %>%
-    .[, 100 * l_L.x * l_L.y * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
-      by=seq_len(nrow(.))],
-  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
-    setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
-    setkey(i) %>%  .[d3] %>%
-    setkey(k) %>%  .[d3] %>%
-    .[!is.na(i), 
-      100 * l_L * i.l_L * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
-      by=.I]
-)
+# library(rprojroot)
+# library(microbenchmark)
+# rootdir <- find_root(has_dir("src"))
+# resdir <- file.path(rootdir, "results")
+# dcigdb <- file.path(resdir, 'dci.gdb')
+# DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
+# NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
+# 
+# j <- '60808111301'
+# d3 <- NetworkBRAZIL[HYBAS_ID08ext==j, list(id=as.character(SEGID), l=Shape_Length)]
+# d2 <-  DamAttributes[DAMBAS_ID08ext ==j, list(id1 = DownSeg, id2 = UpSeg, pass = Allcurrent)]
+# 
+# microbenchmark(
+#   DCIp_opti3(d2, d3, print = NULL),
+#   DCIp_opti5(d2, d3, print = NULL),
+#   times=50L
+# )
