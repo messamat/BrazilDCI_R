@@ -2,19 +2,26 @@
 ################ Plot PARETO and select OPTIMAL and NON-OPTIMAL scenarios #################################
 ###########################################################################################################
 
-## Loand packages
+## Load packages
 require(rPref)
+library(data.table)
+library(fst)
 
-## Import data on scenarios
-NationalScenarios <- read.csv("NationalScen_DCIp.csv", header = T)
-#NationalScenarios <- read.csv("NationalScen_DCIi.csv", header = T)
+# # Import network and dams dataset (Mathis folder structure)
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+dcigdb <- file.path(resdir, 'dci.gdb')
+outdir_permut = file.path(resdir, 'outpermut_basins')
+
+#Import scenarios
+NationalScenarios <- read.fst(file.path(resdir, list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst"))) %>%
+  setDT 
 
 Best <- psel(NationalScenarios, pref = high(NationalScenarios$AddCapacity) * high(NationalScenarios$NatAverageDCI))
 Worst <- psel(NationalScenarios, pref = low(NationalScenarios$AddCapacity) * low(NationalScenarios$NatAverageDCI))
 
-
 ## Plot 6 (DCI loss Vs Capacity)
-tiff(filename = "Figure6.tiff", height = 2396, width = 3500, res = 300, compression = c("lzw"))
+tiff(filename = file.path(resdir, "Figure6.tiff"), height = 2396, width = 3500, res = 300, compression = c("lzw"))
 par(oma = c(8, 7.5, 7, 2), mar = c(0.5, 0, 0, 0), bty = "n")
 
 ## Create a matrix for the layout function
@@ -23,8 +30,6 @@ mat <- matrix(c(1, 1, 2,
                 1, 1, 1), ncol = 3, nrow = 3, byrow = T)
 
 layout(mat = mat, widths = c(3.5, 3.5, 6.0), heights = c(rep(3.5, 0.3, 0.3)))
-
-
 
 ## Plot Individual DCIs Vs Capacity
 plot(NationalScenarios$AddCapacity, NationalScenarios$NatAverageDCI, type = "n", 
@@ -80,9 +85,6 @@ mtext("Non-optimal", side = 3, cex = 2.0, line = 1.5, at = 3.9)
 
 
 dev.off()
-
-
-
 
 ##############################################################################################################
 ##############################################################################################################

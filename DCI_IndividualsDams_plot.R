@@ -1,45 +1,37 @@
+#Purpose: PLOT DCI Loss individual future dams VS Capacity 
+
+library(data.table)
+library(fst)
+
+#Set folder structure
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+dcigdb <- file.path(resdir, 'dci.gdb')
+
+#Import data
+RankedDams <- read.fst(file.path(resdir, 
+                                 list.files(path=resdir, pattern='SamplingIndividualDams_results.*[.]fst'))) %>%
+  setDT %>%
+  setorder('DCIMeanDiff') %>%
+  .[, DamRank := .I]
 
 ### Organize the data to plot
 # Dam rank
-RankedDams <- big_data[order(big_data[,1]),]
-DamRank <- seq(from = 1, to = dim(RankedDams)[1])
-PriorityAnalysis <- cbind(RankedDams, DamRank)
-
-## Export a csv of the prioritization analysis
-# write.csv(PriorityAnalysis, file = "IndividualDam_DCIp.csv")
-# write.csv(PriorityAnalysis, file = "IndividualDam_DCIi.csv")
-
-###############################################################################################################
-####################       PLOT DCI Loss individual future dams VS Capacity       #############################
-###############################################################################################################
-
-# ## Import the csv with the prioritization results
-# PriorityAnalysis <- read.csv("IndividualDam_DCIp.csv", header = T)
-
-## Clumsy version - Multiple runs (2,215 dams)
-## Import the csv with the prioritization results
-PriorityAnalysis1 <- read.csv("IndividualDam_DCIp_Forwards1_1038.csv", header = T)
-PriorityAnalysis2 <- read.csv("IndividualDam_DCIp_Forwards1040_1048.csv", header = T)
-PriorityAnalysis3 <- read.csv("IndividualDam_DCIp_Backwards1063_1049.csv", header = T)
-PriorityAnalysis4 <- read.csv("IndividualDam_DCIp_Backwards1215_1065.csv", header = T)
-
-## Merge all of them in one
-PriorityAnalysisFull <- rbind(PriorityAnalysis1, PriorityAnalysis2, PriorityAnalysis3, PriorityAnalysis4)
-PriorityAnalysisFull$DamRank <- 1:dim(PriorityAnalysisFull)[1]
-PriorityAnalysis <- PriorityAnalysisFull
+DamRank <- seq_along(from = 1, to = dim(RankedDams)[1])
+RankedDams <- cbind(RankedDams, DamRank)
 
 ## Plot 5 (DCI loss Vs Capacity)
-tiff(filename = "Figure5.tiff", height = 2396, width = 3700, res = 300, compression = c("lzw"))
+tiff(filename = file.path(resdir, "Figure5.tiff"), height = 2396, width = 3700, res = 300, compression = c("lzw"))
 par(oma = c(6, 9, 2, 0.5), mar = c(0.5, 0, 0, 0), bty = "n")
 
 
 ## Create a color vector to differentiate SHP and LHP
-TypeFac <- factor(x = PriorityAnalysis$Type)
+TypeFac <- factor(x = RankedDams$Type)
 TypeColor <- factor(x = TypeFac, levels = levels(TypeFac), 
                     labels = c("#4876FF50", "#8B000050"))
 
-## Plot figure #xaxt = "n", log(PriorityAnalysis$Capacity)
-plot(PriorityAnalysis$Capacity, PriorityAnalysis$DCIMeanDiff, type = "n", ylim = c(-60, 0), xlim = c(0.1, 8000),
+## Plot figure #xaxt = "n", log(RankedDams$Capacity)
+plot(RankedDams$Capacity, -RankedDams$DCIMeanDiff, type = "n", ylim = c(-60, 0), xlim = c(0.1, 8000),
      ylab = "", xlab = "",  yaxt = "n", xaxt = "n", log = "x") 
 
 options(scipen=5)
@@ -52,18 +44,18 @@ mtext("river connectivity (DCI)", side = 2, cex = 3.2, line = 4.0)
 mtext("Generation capacity (megawatts)", side = 1, cex = 3.2, line = 4.9)
 
 
-## Plot range log(PriorityAnalysis$Capacity)
-segments(y0 = PriorityAnalysis$DCIUppLim, x0 = PriorityAnalysis$Capacity,
-         y1 = PriorityAnalysis$DCIDownLim, x1 = PriorityAnalysis$Capacity, lwd = 1.6, col = "#42424220")
+## Plot range log(RankedDams$Capacity)
+segments(y0 = -RankedDams$DCIUppLim, x0 = RankedDams$Capacity,
+         y1 = -RankedDams$DCIDownLim, x1 = RankedDams$Capacity, lwd = 1.6, col = "#42424220")
 
 # ## Plot 95% confidence intervals
-# segments(y0 = PriorityAnalysis$DCIUppLim, x0 = log(PriorityAnalysis$Capacity), 
-#          y1 = PriorityAnalysis$DCIDownCI, x1 = log(PriorityAnalysis$Capacity), lwd = 1.3, col = "#42424220")
+# segments(y0 = RankedDams$DCIUppLim, x0 = log(RankedDams$Capacity), 
+#          y1 = RankedDams$DCIDownCI, x1 = log(RankedDams$Capacity), lwd = 1.3, col = "#42424220")
 
-## Plot average log(PriorityAnalysis$Capacity)
-points(PriorityAnalysis$Capacity, PriorityAnalysis$DCIMeanDiff, pch = 21, col = "white", 
+## Plot average log(RankedDams$Capacity)
+points(RankedDams$Capacity, -RankedDams$DCIMeanDiff, pch = 21, col = "white", 
        bg = "white", cex = 2.5)
-points(PriorityAnalysis$Capacity, PriorityAnalysis$DCIMeanDiff, pch = 21, col = "#42424220", 
+points(RankedDams$Capacity, -RankedDams$DCIMeanDiff, pch = 21, col = "#42424220", 
        bg = as.vector(TypeColor), cex = 2.5)
 
 ## Plot legend
@@ -76,55 +68,53 @@ dev.off()
 
 ################################################################################################################
 #####################################  Some Statistics  ########################################################
+RankedDams$Capacity
+RankedDams$DCIMeanDiff
 
-##
-PriorityAnalysis$Capacity
-PriorityAnalysis$DCIMeanDiff
 
 ## Linear models effect on DCI Vs Capacity
-plot(PriorityAnalysis$Capacity, PriorityAnalysis$DCIMeanDiff)
+plot(RankedDams$Capacity, RankedDams$DCIMeanDiff)
+
+#Add 0.001 to dam with 0 impact on DCI and log it
+RankedDams[DCIMeanDiff == 0, DCIMeanDiff := DCIMeanDiff+0.001]
 
 ## All
-overallLm <- lm(log(-PriorityAnalysis$DCIMeanDiff) ~ log(PriorityAnalysis$Capacity))
+overallLm <- lm(log(RankedDams$DCIMeanDiff) ~ log(RankedDams$Capacity))
 summary(overallLm)
 hist(overallLm$resid, main="Histogram of Residuals",
      ylab="Residuals")
 qqnorm(overallLm$resid)
 qqline(overallLm$resid)
-plot(log(PriorityAnalysis$Capacity), log(-PriorityAnalysis$DCIMeanDiff))
+plot(RankedDams$Capacity, RankedDams$DCIMeanDiff, log='xy')
 abline(overallLm)
 
-cor.test(x=log(PriorityAnalysis$Capacity), y=log(-PriorityAnalysis$DCIMeanDiff), method = 'pearson')
-
+cor.test(x=log(RankedDams$Capacity), y=log(RankedDams$DCIMeanDiff), method = 'pearson')
 
 ## Just SHPs
-SHPLm <- lm(log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "SHP"]) ~ log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "SHP"]))
+SHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "SHP"]))
 summary(SHPLm)
 hist(SHPLm$resid, main="Histogram of Residuals",
      ylab="Residuals")
 qqnorm(SHPLm$resid)
 qqline(SHPLm$resid)
-plot(log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "SHP"]), log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "SHP"]))
+plot(log(RankedDams$Capacity[RankedDams$Type == "SHP"]), log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]))
 abline(SHPLm)
 
-cor.test(x=log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "SHP"]), y=log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "SHP"]), method = 'pearson')
+cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "SHP"]), y=log(-RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]), method = 'pearson')
 
 ## Just LHPs
-LHPLm <- lm(log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "LHP"]) ~ log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "LHP"]))
+LHPLm <- lm(log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "LHP"]))
 summary(LHPLm)
 hist(LHPLm$resid, main="Histogram of Residuals",
      ylab="Residuals")
 qqnorm(LHPLm$resid)
 qqline(LHPLm$resid)
-plot(log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "LHP"]), log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "LHP"]))
+plot(log(RankedDams$Capacity[RankedDams$Type == "LHP"]), log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]))
 abline(LHPLm)
 
-cor.test(x=log(PriorityAnalysis$Capacity[PriorityAnalysis$Type == "LHP"]), y=log(-PriorityAnalysis$DCIMeanDiff[PriorityAnalysis$Type == "LHP"]), method = 'pearson')
-
-
+cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]), method = 'pearson')
 
 ## Create a csv of future dams rank basend on mean DCI
-
 ## Add columns with lat-long
 ## Created in ArcGIS two columns with Lat and long of the dams (Decimal degree, WGS 1984)
 FullDamAttrubutes <- read.csv("DamAttributesCoordinates.txt", header = T)
@@ -134,7 +124,7 @@ Long <- vector()
 
 for (i in 1: dim(OrderDams)[1]){
   
-  IDName_Position <- which(FullDamAttrubutes$TARGET_FID == PriorityAnalysis$ID[i] & FullDamAttrubutes$NOME %in% PriorityAnalysis$Name[i])
+  IDName_Position <- which(FullDamAttrubutes$TARGET_FID == RankedDams$ID[i] & FullDamAttrubutes$NOME %in% RankedDams$Name[i])
   DamLatLong <- FullDamAttrubutes[IDName_Position, 20:21]
   Lat <- c(Lat, FullDamAttrubutes$Lat[IDName_Position])
   Long <- c(Long, FullDamAttrubutes$Long[IDName_Position])
@@ -142,11 +132,10 @@ for (i in 1: dim(OrderDams)[1]){
 }
 
 ## Organize order and headers
-OrderDams <- data.frame(PriorityAnalysis$DamRank, PriorityAnalysis$Type, PriorityAnalysis$ID, PriorityAnalysis$Name, round(PriorityAnalysis$Capacity, digits = 1),
-                        round(PriorityAnalysis$DCIMeanDiff, digits = 1), round(PriorityAnalysis$DCIDownLim, digits = 1), round(PriorityAnalysis$DCIUppLim, digits = 1),
+OrderDams <- data.frame(RankedDams$DamRank, RankedDams$Type, RankedDams$ID, RankedDams$Name, round(RankedDams$Capacity, digits = 1),
+                        round(RankedDams$DCIMeanDiff, digits = 1), round(RankedDams$DCIDownLim, digits = 1), round(RankedDams$DCIUppLim, digits = 1),
                         Lat, Long)
 colnames(OrderDams) <- c("Rank", "Type",  "DamID", "Name", "Capacity(MW)", "Mean effect on basin's DCI", "Lower limit", "Upper limit", "Latitude", "Longitude")
-
 
 
 write.csv(OrderDams, file = "Supplement_FutureDamRank.csv")

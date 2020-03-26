@@ -34,6 +34,10 @@ rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
+#Source functions
+source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
+DCIfunc <- DCIp_opti3 ## Choose what type of DCI function to run (DCIp or DCIi)
+
 ## Import network and dams dataset (alternative)
 # rootdir <- find_root(has_dir("PythonOutputs"))
 # datadir <- file.path(rootdir, "PythonOutputs")

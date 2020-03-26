@@ -9,10 +9,6 @@
 ###########               Level 8 All Scenarios            ################################################
 #########################################################################################################
 
-## Choose what type of DCI function to run (DCIp or DCIi)
-DCIfunc <- DCIp_opti3
-# DCIfunc <- DCId_opti
-
 ## Packages
 require(tictoc)
 require(plyr)
@@ -23,6 +19,10 @@ library(data.table)
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
+
+#Source functions
+source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
+DCIfunc <- DCIp_opti3 ## Choose what type of DCI function to run (DCIp or DCIi)
 
 #Import formatted data
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT

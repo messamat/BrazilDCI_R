@@ -12,6 +12,8 @@ resdir <- file.path(rootdir, "results")
 datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
+#Source functions
+source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
 
 ## Import network and dams dataset (alternative)
 # rootdir <- find_root(has_dir("PythonOutputs"))
@@ -98,7 +100,7 @@ DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "SHP" & DamAttributes$POT_KW 
 DamAttributes$Tipo_1[which(DamAttributes$Tipo_1 == "LHP" & DamAttributes$POT_KW < 30000 &
                              DamAttributes$AREA_NA_MA < 13.0 & DamAttributes$ESTAGIO_1 == "Planned")] <- "SHP"   #Keep old dams as UHEs and new ones as SHPs
 
-#Convert data frmes to data tables to speed up analysis
+#Convert dataframes to data tables to speed up analysis
 DamAttributes <- as.data.table(DamAttributes)
 NetworkBRAZIL <- as.data.table(NetworkBRAZIL)
 
