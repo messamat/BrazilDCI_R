@@ -141,12 +141,11 @@ DCIscens <- foreach(j=basinList, #basinList, ## Loop over basins
                               by='DAMID', allow.cartesian=F)
                       
                       #Run DCI for each scenario
-                      # DCIX<- scenarios_reg[, 
-                      #                      list(DCI = DCIfunc(d3=NetX[, list(id=as.character(SEGID), l=Shape_Length)],
-                      #                                         d2=.SD[, list(id1 = DownSeg, id2 = UpSeg, pass = value)],
-                      #                                         print = F)),
-                      #                      by=.(scenbasin)]
-                      DCIX <- scenarios_reg[, list(DCI=round(100*runif(1))), by=.(scenbasin)]
+                      DCIX<- scenarios_reg[,
+                                           list(DCI = DCIfunc(d3=NetX[, list(id=as.character(SEGID), l=Shape_Length)],
+                                                              d2=.SD[, list(id1 = DownSeg, id2 = UpSeg, pass = value)],
+                                                              print = F)),
+                                           by=.(scenbasin)]
                       
                       #Get statistics on scenario for portfolio analysis
                       scenarios_reg[ESTAGIO_1=='Planned' & value==0.1,

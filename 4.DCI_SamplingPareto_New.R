@@ -81,24 +81,6 @@ allscens <- lapply(file.path(outdir_permut, list.files(outdir_permut)),
   do.call(rbind, .) %>%
   setDT
 
-#Import scenarios with 0 dams
-outdir_permut = file.path(resdir, 'outpermut_basins2')
-allscens2 <- lapply(file.path(outdir_permut, list.files(outdir_permut)), 
-                   function(x) read.fst(x, columns = c("scenbasin", "DAMBAS_ID08ext", "ndams", "POT_KWbasin", "SHPnum", "LHPnum",
-                                                       "prevfree","DCI"))) %>%
-  do.call(rbind, .) %>%
-  setDT
-
-allscens <- allscens[, .(scenbasin, DAMBAS_ID08ext, DCI)][
-  allscens2[, .(scenbasin, DAMBAS_ID08ext, ndams, POT_KWbasin, SHPnum, LHPnum, prevfree), ],
-  on=.(scenbasin, DAMBAS_ID08ext)]
-
-for (j in unique(allscens$DAMBAS_ID08ext)) {
-  print(j)
-  write.fst(allscens[DAMBAS_ID08ext == j,], file.path(outdir_permut, paste0('permut_', j, '.fst')))
-}
-
-
 #Add scenario with no new dam
 nbasins <- allscens[, length(unique(DAMBAS_ID08ext))]
 
