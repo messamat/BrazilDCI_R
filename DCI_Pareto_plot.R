@@ -3,9 +3,10 @@
 ###########################################################################################################
 
 ## Load packages
-require(rPref)
+library(rPref)
 library(data.table)
 library(fst)
+library(rprojroot)
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
@@ -14,8 +15,10 @@ dcigdb <- file.path(resdir, 'dci.gdb')
 outdir_permut = file.path(resdir, 'outpermut_basins')
 
 #Import scenarios
-NationalScenarios <- read.fst(file.path(resdir, list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst"))) %>%
-  setDT 
+nationalfiles <- list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst")
+NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
+  setDT %>%
+  unique #Only keep unique scenarios (mostly removes the multiple scenarios with all dams or no dams)
 
 Best <- psel(NationalScenarios, pref = high(NationalScenarios$AddCapacity) * high(NationalScenarios$NatAverageDCI))
 Worst <- psel(NationalScenarios, pref = low(NationalScenarios$AddCapacity) * low(NationalScenarios$NatAverageDCI))

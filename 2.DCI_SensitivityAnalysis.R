@@ -15,13 +15,6 @@ rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
-#Create output directory
-outdir_permut = file.path(resdir, 'outpermut_basins')
-if (!dir.exists(outdir_permut)) {
-  print(paste0('Create ', outdir_permut, '...'))
-  dir.create(outdir_permut)
-}
-
 #Source functions
 source(file.path(rootdir, 'src', 'BrazilDCI_R', 'DCIAnalysis.R'))
 DCIfunc <- DCIp_opti5 ## Choose what type of DCI function to run (DCIp or DCIi)

@@ -3,6 +3,22 @@
 #############################################################################################################
 #####################################     PLOTS FIGURE 2     ################################################
 
+
+## Packages
+library(tictoc)
+library(plyr)
+library(data.table)
+library(rprojroot)
+library(fst)
+require(bigstatsr)
+require(parallel)
+require(doParallel)
+
+# Import network and dams dataset (Mathis folder structure)
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+dcigdb <- file.path(resdir, 'dci.gdb')
+
 ## Import data
 resuDCI <- as.data.frame(read.csv("DCI_Brazil_L8_DCIp.csv", header = T))
 resuNDams <- as.data.frame(read.csv("basinNDams_L8_DCIp.csv", header = T))
@@ -72,7 +88,7 @@ PercLoss_Regul_LHP <- DCILoss_Regul_LHP/resuDCI_Regul$LHP_curr * 100
 
 ###############################################################################################################
 ##### Plot % change
-tiff(filename = "Figure2.tiff", height = 1656, width = 3200, res = 300, compression = c("lzw"))
+tiff(filename = file.path(resdir, "Figure2.tiff"), height = 1656, width = 3200, res = 300, compression = c("lzw"))
 
 mat <- matrix(c(rep(1, times = 2), rep(2, times = 2), rep(3, times = 2)), ncol = 3, nrow = 2, byrow = F)
 layout(mat = mat, widths = c(4, 4, 4), heights = c(rep(0.5, times = 3)))

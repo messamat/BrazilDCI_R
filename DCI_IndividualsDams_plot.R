@@ -2,6 +2,8 @@
 
 library(data.table)
 library(fst)
+library(rprojroot)
+library(magrittr)
 
 #Set folder structure
 rootdir <- find_root(has_dir("src"))
@@ -17,8 +19,7 @@ RankedDams <- read.fst(file.path(resdir,
 
 ### Organize the data to plot
 # Dam rank
-DamRank <- seq_along(from = 1, to = dim(RankedDams)[1])
-RankedDams <- cbind(RankedDams, DamRank)
+RankedDams[, DamRank := .I]
 
 ## Plot 5 (DCI loss Vs Capacity)
 tiff(filename = file.path(resdir, "Figure5.tiff"), height = 2396, width = 3700, res = 300, compression = c("lzw"))
@@ -100,42 +101,41 @@ qqline(SHPLm$resid)
 plot(log(RankedDams$Capacity[RankedDams$Type == "SHP"]), log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]))
 abline(SHPLm)
 
-cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "SHP"]), y=log(-RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]), method = 'pearson')
+cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "SHP"]), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]), method = 'pearson')
 
 ## Just LHPs
-LHPLm <- lm(log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "LHP"]))
+LHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "LHP"]))
 summary(LHPLm)
 hist(LHPLm$resid, main="Histogram of Residuals",
      ylab="Residuals")
 qqnorm(LHPLm$resid)
 qqline(LHPLm$resid)
-plot(log(RankedDams$Capacity[RankedDams$Type == "LHP"]), log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]))
+plot(log(RankedDams$Capacity[RankedDams$Type == "LHP"]), log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]))
 abline(LHPLm)
 
-cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(-RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]), method = 'pearson')
+cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]), method = 'pearson')
 
 ## Create a csv of future dams rank basend on mean DCI
 ## Add columns with lat-long
 ## Created in ArcGIS two columns with Lat and long of the dams (Decimal degree, WGS 1984)
-FullDamAttrubutes <- read.csv("DamAttributesCoordinates.txt", header = T)
-
-Lat <- vector()
-Long <- vector()
-
-for (i in 1: dim(OrderDams)[1]){
-  
-  IDName_Position <- which(FullDamAttrubutes$TARGET_FID == RankedDams$ID[i] & FullDamAttrubutes$NOME %in% RankedDams$Name[i])
-  DamLatLong <- FullDamAttrubutes[IDName_Position, 20:21]
-  Lat <- c(Lat, FullDamAttrubutes$Lat[IDName_Position])
-  Long <- c(Long, FullDamAttrubutes$Long[IDName_Position])
-  
-}
-
-## Organize order and headers
-OrderDams <- data.frame(RankedDams$DamRank, RankedDams$Type, RankedDams$ID, RankedDams$Name, round(RankedDams$Capacity, digits = 1),
-                        round(RankedDams$DCIMeanDiff, digits = 1), round(RankedDams$DCIDownLim, digits = 1), round(RankedDams$DCIUppLim, digits = 1),
-                        Lat, Long)
-colnames(OrderDams) <- c("Rank", "Type",  "DamID", "Name", "Capacity(MW)", "Mean effect on basin's DCI", "Lower limit", "Upper limit", "Latitude", "Longitude")
-
-
-write.csv(OrderDams, file = "Supplement_FutureDamRank.csv")
+# FullDamAttrubutes <- read.csv("DamAttributesCoordinates.txt", header = T)
+# 
+# Lat <- vector()
+# Long <- vector()
+# 
+# for (i in 1: dim(OrderDams)[1]){
+#   IDName_Position <- which(FullDamAttrubutes$TARGET_FID == RankedDams$ID[i] & FullDamAttrubutes$NOME %in% RankedDams$Name[i])
+#   DamLatLong <- FullDamAttrubutes[IDName_Position, 20:21]
+#   Lat <- c(Lat, FullDamAttrubutes$Lat[IDName_Position])
+#   Long <- c(Long, FullDamAttrubutes$Long[IDName_Position])
+#   
+# }
+# 
+# ## Organize order and headers
+# OrderDams <- data.frame(RankedDams$DamRank, RankedDams$Type, RankedDams$ID, RankedDams$Name, round(RankedDams$Capacity, digits = 1),
+#                         round(RankedDams$DCIMeanDiff, digits = 1), round(RankedDams$DCIDownLim, digits = 1), round(RankedDams$DCIUppLim, digits = 1),
+#                         Lat, Long)
+# colnames(OrderDams) <- c("Rank", "Type",  "DamID", "Name", "Capacity(MW)", "Mean effect on basin's DCI", "Lower limit", "Upper limit", "Latitude", "Longitude")
+# 
+# 
+# write.csv(OrderDams, file = "Supplement_FutureDamRank.csv")

@@ -9,7 +9,7 @@
 ###########            (National-level multi-objective optimization)       #####################################
 ###############################################################################################################
 ## Choose the number of scenarios to sample
-numbScen <- 10000
+numbScen <- 1000000
 
 ## Packages
 require(tictoc)
@@ -18,6 +18,8 @@ require(bigstatsr)
 require(parallel)
 require(doParallel)
 library(fst)
+library(rprojroot)
+library(magrittr)
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
@@ -86,14 +88,14 @@ doParallel::registerDoParallel(cl)
 DCIscens <- foreach(i=scen_numdams, 
                     .packages = c("data.table", "magrittr")) %dopar% {
 
-                      scenbasin <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
+                      scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
                         setorder(DAMID) %>%
                         .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
                         .[, DAMBAS_ID08ext := NULL] %>%
                         setkey(DamIDs) 
-                      
+                      head(allscens)
                       return(
-                        allscens[scenbasin] %>% #Match with specific scenario DCI based on list of dams 
+                        allscens[scendams] %>% #Match with specific scenario DCI based on list of dams 
                           rbind(DCI_L8_current[!(DAMBAS_ID08ext %in% .$DAMBAS_ID08ext),]) %>% #Add other basins without new dams
                           setorder(DAMBAS_ID08ext) %>%
                           .[, list(NatAverageDCI = mean(DCI, na.rm=T), #Get statistics
@@ -102,7 +104,7 @@ DCIscens <- foreach(i=scen_numdams,
                                    NFutSHP = sum(SHPnum, na.rm=T),
                                    NFutLHP = sum(LHPnum, na.rm=T),
                                    NFreeDammed = sum(prevfree, na.rm=T),
-                                   scenIDs = toString(scenbasin))]
+                                   scenIDs = paste(scenbasin, collapse=','))]
                       )} %>%
   do.call(rbind, .) %>% setDT
 stopCluster(cl)
