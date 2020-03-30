@@ -3,6 +3,7 @@
 ###########################################################################################################
 
 ## Load packages
+library(magrittr)
 library(rPref)
 library(data.table)
 library(fst)
@@ -13,6 +14,10 @@ rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
 outdir_permut = file.path(resdir, 'outpermut_basins')
+
+#Import formatted data
+DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
+NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
 #Import scenarios
 nationalfiles <- list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst")
