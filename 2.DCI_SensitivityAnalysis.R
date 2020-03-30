@@ -1,5 +1,3 @@
-#To do: create function to prepare dam passability for a scenario based on year, dam size, and passability
-
 ## Packages
 library(tictoc)
 library(plyr)
@@ -51,17 +49,16 @@ dampassformat <- function(damdt, pasvec = c(0.1, 0.1)) {
     setnames(c('variable', 'value'), c('scenario', 'passability'))
 }
 
-DCI_bybasscen <- function(netdt, damdt, scencol = 'scenario') {
-  damdt[,
-        list(DCI = DCIfunc(d3=netdt[HYBAS_ID08ext==DAMBAS_ID08ext,
-                                    list(id=as.character(SEGID), 
-                                         l=Shape_Length)],
-                           d2=.SD[, list(id1 = DownSeg, 
-                                         id2 = UpSeg, 
-                                         pass = passability)],
-                           print = F),
-             passpar),
-        by=c('DAMBAS_ID08ext', scencol)]
+DCI_bybasscen <- function(netdt, damformatdt, scencol = 'scenario') {
+  damformatdt[,
+              list(DCI = DCIfunc(d3=netdt[HYBAS_ID08ext==DAMBAS_ID08ext,
+                                          list(id=as.character(SEGID), 
+                                               l=Shape_Length)],
+                                 d2=.SD[, list(id1 = DownSeg, 
+                                               id2 = UpSeg, 
+                                               pass = passability)],
+                                 print = F)),
+              by=c('DAMBAS_ID08ext', 'passpar', scencol)]
 }
 
 
@@ -86,8 +83,8 @@ DCIsentivity <- foreach(j=allpass[,.I], #basinList, ## Loop over basins
                           
                           if (!file.exists(outf) | overwrite==TRUE) {
                             DCIpasscen <- DCI_bybasscen(netdt = NetworkBRAZIL,
-                                                        damdt = dampassformat(DamAttributes, 
-                                                                              pasvec = unlist(allpass[j])),
+                                                        damformatdt = dampassformat(damdt = DamAttributes, 
+                                                                                    pasvec = unlist(allpass[j])),
                                                         scencol = 'scenario')
                             write.fst(DCIpasscen, outf)
                           }
