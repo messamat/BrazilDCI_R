@@ -1,4 +1,5 @@
 library(rprojroot)
+library(magrittr)
 library(data.table)
 library(fst)
 library(plyr)
@@ -15,68 +16,48 @@ DCIsensitivity <-  Map(read.fst,
                                list.files(path=outdir_sensitivity, pattern="DCIsensitivity_.*[.]fst"))) %>%
   do.call(rbind, .) %>%
   setDT %>%
-  .[, DCI := as.integer(round(DCI))]
+  .[, DCI := as.integer(round(DCI))] %>%
+  unique
 
-#Plot distribution of variables to check for odd values
-summary(DCIsensitivity)
-
-#Identify basins that are currently free of hydropower, currently regulated, and those with both SHPs and LHPs in the future
+#Identify basins that are currently free of hydropower (1), currently regulated, and those with both SHPs and LHPs in the future
 DCIsensitivity[, `:=`(prevfree = +(DAMBAS_ID08ext %in% 
                                      DCIsensitivity[scenario=='Allcurrent' & DCI==100, 
                                                     DAMBAS_ID08ext]),
                       bothtypes = +(DAMBAS_ID08ext %in% 
                                       DCIsensitivity[(scenario=='SHPfuture' & DCI!=100) | (scenario=='LHPfuture' & DCI!=100), 
                                                      DAMBAS_ID08ext]))]
-  
-#Filter results 
-               
+
+#calculate differences between future and current
+DCIsensitivity[, `:=`(scentime=ifelse(grepl('current', scenario), 'current', 'future'), #Separate scenarios into type and time
+                      scentype = gsub('current|future', '', scenario))]
+
+DCIloss <- dcast(DCIsensitivity, DAMBAS_ID08ext+passpar+prevfree+bothtypes+scentype~scentime, value.var = 'DCI') %>% #Compute loss
+  .[, `:=`(DCIloss = future-current,
+           DCIlossperc = 100*(future-current)/current)]
       
-#Compute average brazil-wide DCI for 
-DCIsensitivity_mean <- DCIsensitivty[mean(DCI), by=.(passpar, scenario)]
+#Compute average brazil-wide DCI percentage loss for all basins, previously free of dams and not previously free of dams
+passcols <- c("SHP passability","LHP passability")
+DCIlossstats <- DCIloss[, list(meanloss = mean(DCIlossperc)), by=.(passpar, prevfree, scentype)] %>% #Compute DCIloss for previously free vs not previously free
+  rbind(DCIloss[, list(meanloss = mean(DCIlossperc), prevfree = 2), by=.(passpar, scentype)]) %>%  #bind with statistics for all together
+  .[, prevfree := factor(prevfree, labels = c("Regulated basins", "Hydro-free basins", "All basins"))] %>%
+  .[, (passcols) := tstrsplit(passpar, ", ", fixed=TRUE)] %>% #Separate passability scenarios into two columns
+  .[, (passcols) := lapply(.SD, as.numeric), .SDcols = passcols] %>% #Convert to numeric
+  setorderv(passcols, order=-1L) #Order in descending order the passability so that low passability shows on top
 
-
-
-################################################################################################################################
-################################################################################################################################
-
-## Calculate differences
-DCILoss_All <- resuDCI$All_fut - resuDCI$All_curr
-DCILoss_SHP <- resuDCI$SHP_fut - resuDCI$SHP_curr
-DCILoss_LHP <- resuDCI$LHP_fut - resuDCI$LHP_curr
-
-DCILoss_Both_All <- resuDCI_Both$All_fut - resuDCI_Both$All_curr
-DCILoss_Both_SHP <- resuDCI_Both$SHP_fut - resuDCI_Both$SHP_curr
-DCILoss_Both_LHP <- resuDCI_Both$LHP_fut - resuDCI_Both$LHP_curr
-
-DCILoss_Free_All <- resuDCI_Free$All_fut - resuDCI_Free$All_curr
-DCILoss_Free_SHP <- resuDCI_Free$SHP_fut - resuDCI_Free$SHP_curr
-DCILoss_Free_LHP <- resuDCI_Free$LHP_fut - resuDCI_Free$LHP_curr
-
-DCILoss_Regul_All <- resuDCI_Regul$All_fut - resuDCI_Regul$All_curr
-DCILoss_Regul_SHP <- resuDCI_Regul$SHP_fut - resuDCI_Regul$SHP_curr
-DCILoss_Regul_LHP <- resuDCI_Regul$LHP_fut - resuDCI_Regul$LHP_curr
-
-
-## Calculate % change (new - old / old * 100)
-PercLoss_All <- DCILoss_All/resuDCI$All_curr * 100
-PercLoss_SHP <- DCILoss_SHP/resuDCI$SHP_curr * 100
-PercLoss_LHP <- DCILoss_LHP/resuDCI$LHP_curr * 100
-
-PercLoss_Both_All <- DCILoss_Both_All/resuDCI_Both$All_curr * 100
-PercLoss_Both_SHP <- DCILoss_Both_SHP/resuDCI_Both$SHP_curr * 100
-PercLoss_Both_LHP <- DCILoss_Both_LHP/resuDCI_Both$LHP_curr * 100
-
-PercLoss_Free_All <- DCILoss_Free_All/resuDCI_Free$All_curr * 100
-PercLoss_Free_SHP <- DCILoss_Free_SHP/resuDCI_Free$SHP_curr * 100
-PercLoss_Free_LHP <- DCILoss_Free_LHP/resuDCI_Free$LHP_curr * 100
-
-PercLoss_Regul_All <- DCILoss_Regul_All/resuDCI_Regul$All_curr * 100
-PercLoss_Regul_SHP <- DCILoss_Regul_SHP/resuDCI_Regul$SHP_curr * 100
-PercLoss_Regul_LHP <- DCILoss_Regul_LHP/resuDCI_Regul$LHP_curr * 100
-
-
-
-
-points(x = treatment[1] * 1, y = mean(PercLoss_Free_SHP), pch = "-", col = "black", cex = 13.0)
-points(x = treatment[1] * 2, y = mean(PercLoss_Free_LHP), pch = "-", col = "black", cex = 13.0)
-points(x = treatment[1] * 3, y = mean(PercLoss_Free_All), pch = "-", col = "black", cex = 13.0)
+#Plot
+tiff(filename = file.path(resdir, "Figure_sensitivity.tiff"), height = 2000, width = 3200, res = 300, compression = c("lzw"))
+ggplot(DCIlossstats, aes(x=`SHP passability`, y=-meanloss, color=`LHP passability`)) + 
+  geom_point(size=2, alpha=1/2) + 
+  facet_grid(prevfree~scentype, labeller=label_value) + 
+  scale_y_sqrt(name='Loss in river connectivity (%)', expand=c(0,0), breaks=c(0,1,5,10,20, 40)) +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_color_distiller(palette='Spectral') +
+  coord_cartesian(clip = 'off') +
+  theme_bw() + 
+  theme(panel.border = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.spacing = unit(.65, "cm"),
+        text = element_text(size=15),
+        strip.background = element_rect(fill='white', color='white'),
+        strip.text = element_text(face="bold"))
+dev.off()
