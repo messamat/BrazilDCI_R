@@ -15,11 +15,11 @@ RankedDams <- read.fst(file.path(resdir,
                                  list.files(path=resdir, pattern='SamplingIndividualDams_results.*[.]fst'))) %>%
   setDT %>%
   setorder('DCIMeanDiff') %>%
-  .[, DamRank := .I]
+  .[, DamRank := .I] #Organize the data to plot
 
-### Organize the data to plot
-# Dam rank
-RankedDams[, DamRank := .I]
+#Correct a small glitch
+RankedDams[DCIDownLim<0, DCIDownLim := 0]
+RankedDams[DCIDownCI<0, DCIDownCI := 0]
 
 ## Plot 5 (DCI loss Vs Capacity)
 tiff(filename = file.path(resdir, "Figure5.tiff"), height = 2396, width = 3700, res = 300, compression = c("lzw"))
@@ -115,9 +115,9 @@ abline(LHPLm)
 
 cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]), method = 'pearson')
 
-## Create a csv of future dams rank basend on mean DCI
-## Add columns with lat-long
-## Created in ArcGIS two columns with Lat and long of the dams (Decimal degree, WGS 1984)
+# ## Create a csv of future dams rank basend on mean DCI
+# ## Add columns with lat-long
+# ## Created in ArcGIS two columns with Lat and long of the dams (Decimal degree, WGS 1984)
 # FullDamAttrubutes <- read.csv("DamAttributesCoordinates.txt", header = T)
 # 
 # Lat <- vector()
@@ -128,7 +128,7 @@ cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$
 #   DamLatLong <- FullDamAttrubutes[IDName_Position, 20:21]
 #   Lat <- c(Lat, FullDamAttrubutes$Lat[IDName_Position])
 #   Long <- c(Long, FullDamAttrubutes$Long[IDName_Position])
-#   
+# 
 # }
 # 
 # ## Organize order and headers
