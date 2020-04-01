@@ -16,7 +16,6 @@ DCIsensitivity <-  Map(read.fst,
                                list.files(path=outdir_sensitivity, pattern="DCIsensitivity_.*[.]fst"))) %>%
   do.call(rbind, .) %>%
   setDT %>%
-  .[, DCI := as.integer(round(DCI))] %>%
   unique
 
 #Identify basins that are currently free of hydropower (1), currently regulated, and those with both SHPs and LHPs in the future
@@ -31,7 +30,7 @@ DCIsensitivity[, `:=`(prevfree = +(DAMBAS_ID08ext %in%
 DCIsensitivity[, `:=`(scentime=ifelse(grepl('current', scenario), 'current', 'future'), #Separate scenarios into type and time
                       scentype = gsub('current|future', '', scenario))]
 
-DCIloss <- dcast(DCIsensitivity, DAMBAS_ID08ext+passpar+prevfree+bothtypes+scentype~scentime, value.var = 'DCI') %>% #Compute loss
+DCIloss <- dcast(DCIsensitivity, DAMBAS_ID08ext+passpar+prevfree+bothtypes+scentype~scentime, value.var = 'DCI')  %>% #Compute loss
   .[, `:=`(DCIloss = future-current,
            DCIlossperc = 100*(future-current)/current)]
       
