@@ -37,18 +37,19 @@ DCIloss <- dcast(DCIsensitivity, DAMBAS_ID08ext+passpar+prevfree+bothtypes+scent
 #Compute average brazil-wide DCI percentage loss for all basins, previously free of dams and not previously free of dams
 passcols <- c("SHP passability","LHP passability")
 DCIlossstats <- DCIloss[, list(meanloss = mean(DCIlossperc)), by=.(passpar, prevfree, scentype)] %>% #Compute DCIloss for previously free vs not previously free
-  rbind(DCIloss[, list(meanloss = mean(DCIlossperc), prevfree = 2), by=.(passpar, scentype)]) %>%  #bind with statistics for all together
+  rbind(DCIloss[, list(meanloss = mean(DCIloss), prevfree = 2), by=.(passpar, scentype)]) %>%  #bind with statistics for all together
   .[, prevfree := factor(prevfree, labels = c("Regulated basins", "Hydro-free basins", "All basins"))] %>%
   .[, (passcols) := tstrsplit(passpar, ", ", fixed=TRUE)] %>% #Separate passability scenarios into two columns
   .[, (passcols) := lapply(.SD, as.numeric), .SDcols = passcols] %>% #Convert to numeric
   setorderv(passcols, order=-1L) #Order in descending order the passability so that low passability shows on top
+
 
 #Plot
 tiff(filename = file.path(resdir, "Figure_sensitivity.tiff"), height = 2000, width = 3200, res = 300, compression = c("lzw"))
 ggplot(DCIlossstats, aes(x=`SHP passability`, y=-meanloss, color=`LHP passability`)) + 
   geom_point(size=2, alpha=1/2) + 
   facet_grid(prevfree~scentype, labeller=label_value) + 
-  scale_y_sqrt(name='Loss in river connectivity (%)', expand=c(0,0), breaks=c(0,1,5,10,20, 40)) +
+  scale_y_sqrt(name='Loss in river connectivity (%)', expand=c(0,0), breaks=c(0,1,5,10,20,30,40)) +
   scale_x_continuous(expand=c(0,0)) +
   scale_color_distiller(palette='Spectral') +
   coord_cartesian(clip = 'off') +
