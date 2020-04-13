@@ -8,8 +8,8 @@
 ###########                        Sample future portifolios               ######################################
 ###########            (National-level multi-objective optimization)       #####################################
 ###############################################################################################################
-## Choose the number of scenarios to sample
-numbScen <- 1010000
+## Choose the total number of scenarios to sample (includes already sampled scenarios)
+numbScen <- 1005000
 
 ## Packages
 require(tictoc)
@@ -76,8 +76,23 @@ DCI_L8_current[, `:=`(scenbasin = 0,
                       prevfree = NA)] %>%
   setnames('HYBAS_ID08ext', 'DAMBAS_ID08ext') 
 
+
+#---------------- Check whether scenarios already exist and adjust number to sample ------
+#Check whether 
+nationalfiles <- list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst")
+if (length(nationalfiles) > 0) {
+  NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
+    setDT %>%
+    unique #Only keep unique scenarios (mostly removes the multiple scenarios with all dams or no dams)
+  numbScen = numbScen - NationalScenarios[substr(scenIDs, 1,2) != 'NA', .N]
+  remove(NationalScenarios)
+  gc()
+}
+
+#----------------- Launch sampling -------------------------------------------------------
 #Sample number of scenarios
 scen_numdams<- sample(x = 1:MaxFutDams, size = numbScen, replace=T)
+scens_sampledbas <- allscens[DAMBAS_ID08ext=='60808111301',] #All scenarios that have DCI for basin ID '60808111301'
 
 #First sample number of dams, then sample dams
 tic()
@@ -85,32 +100,9 @@ cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recomm
 on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
-
-microbenchmark::microbenchmark(
-  {scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
-    setorder(DAMID) %>%
-    .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
-    setkey(DamIDs) 
-  
-  ndams_sampledbas <- scendams[DAMBAS_ID08ext == '60808111301', 
-                               length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
-  selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
-  scendams[DAMBAS_ID08ext == '60808111301',
-           DamIDs := selectscen_sampledbas]
-  },
-  scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
-    setorder(DAMID) %>%
-    .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
-    .[, DAMBAS_ID08ext := NULL] %>%
-    setkey(DamIDs), 
-  times=100)
-
-scens_sampledbas <- allscens[DAMBAS_ID08ext=='60808111301',] #All sampled scenarios for basin ID '60808111301'
-
 DCIscens <- foreach(i=scen_numdams, 
                     .packages = c("data.table", "magrittr")) %dopar% {
                       
-
                       scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
                         setorder(DAMID) %>%
                         .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
@@ -120,7 +112,8 @@ DCIscens <- foreach(i=scen_numdams,
                                length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
                       selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
                       scendams[DAMBAS_ID08ext == '60808111301',
-                               DamIDs := selectscen_sampledbas]
+                               DamIDs := selectscen_sampledbas] %>%
+                        .[, DAMBAS_ID08ext := NULL]
 
                       #head(allscens)
                       return(
