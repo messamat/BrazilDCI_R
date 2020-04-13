@@ -9,7 +9,7 @@
 ###########            (National-level multi-objective optimization)       #####################################
 ###############################################################################################################
 ## Choose the number of scenarios to sample
-numbScen <- 1000000
+numbScen <- 1010000
 
 ## Packages
 require(tictoc)
@@ -85,15 +85,46 @@ cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recomm
 on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
+
+microbenchmark::microbenchmark({                      
+  scenexists <- TRUE 
+  while (scenexists) {
+    scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
+      setorder(DAMID) %>%
+      .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
+      setkey(DamIDs) 
+    
+    scenexists <- is.na(
+      allscens[scendams[DAMBAS_ID08ext == '60808111301',], 
+               scenbasin])
+  }
+  },
+  scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
+    setorder(DAMID) %>%
+    .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
+    .[, DAMBAS_ID08ext := NULL] %>%
+    setkey(DamIDs), 
+  times=10)
+
+scens60808111301 <- allscens[DAMBAS_ID08ext=='60808111301',]
+
 DCIscens <- foreach(i=scen_numdams, 
                     .packages = c("data.table", "magrittr")) %dopar% {
+                      
 
                       scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
                         setorder(DAMID) %>%
                         .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
-                        .[, DAMBAS_ID08ext := NULL] %>%
                         setkey(DamIDs) 
-                      head(allscens)
+                      
+                      scendams[DAMBAS_ID08ext == '60808111301',]
+                        
+                        scenexists <- is.na(
+                          allscens[scendams[DAMBAS_ID08ext == '60808111301',], 
+                                   scenbasin])
+                      }
+                      
+                      #head(allscens)
                       return(
                         allscens[scendams] %>% #Match with specific scenario DCI based on list of dams 
                           rbind(DCI_L8_current[!(DAMBAS_ID08ext %in% .$DAMBAS_ID08ext),]) %>% #Add other basins without new dams
