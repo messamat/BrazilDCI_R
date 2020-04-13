@@ -86,27 +86,26 @@ on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
 
-microbenchmark::microbenchmark({                      
-  scenexists <- TRUE 
-  while (scenexists) {
-    scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
-      setorder(DAMID) %>%
-      .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
-      setkey(DamIDs) 
-    
-    scenexists <- is.na(
-      allscens[scendams[DAMBAS_ID08ext == '60808111301',], 
-               scenbasin])
-  }
+microbenchmark::microbenchmark(
+  {scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
+    setorder(DAMID) %>%
+    .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
+    setkey(DamIDs) 
+  
+  ndams_sampledbas <- scendams[DAMBAS_ID08ext == '60808111301', 
+                               length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
+  selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
+  scendams[DAMBAS_ID08ext == '60808111301',
+           DamIDs := selectscen_sampledbas]
   },
   scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
     setorder(DAMID) %>%
     .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
     .[, DAMBAS_ID08ext := NULL] %>%
     setkey(DamIDs), 
-  times=10)
+  times=100)
 
-scens60808111301 <- allscens[DAMBAS_ID08ext=='60808111301',]
+scens_sampledbas <- allscens[DAMBAS_ID08ext=='60808111301',] #All sampled scenarios for basin ID '60808111301'
 
 DCIscens <- foreach(i=scen_numdams, 
                     .packages = c("data.table", "magrittr")) %dopar% {
@@ -117,13 +116,12 @@ DCIscens <- foreach(i=scen_numdams,
                         .[, .(DamIDs = toString(DAMID)) , by=DAMBAS_ID08ext] %>%
                         setkey(DamIDs) 
                       
-                      scendams[DAMBAS_ID08ext == '60808111301',]
-                        
-                        scenexists <- is.na(
-                          allscens[scendams[DAMBAS_ID08ext == '60808111301',], 
-                                   scenbasin])
-                      }
-                      
+                      ndams_sampledbas <- scendams[DAMBAS_ID08ext == '60808111301', 
+                               length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
+                      selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
+                      scendams[DAMBAS_ID08ext == '60808111301',
+                               DamIDs := selectscen_sampledbas]
+
                       #head(allscens)
                       return(
                         allscens[scendams] %>% #Match with specific scenario DCI based on list of dams 
