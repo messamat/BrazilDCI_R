@@ -9,7 +9,7 @@
 ###########            (National-level multi-objective optimization)       #####################################
 ###############################################################################################################
 ## Choose the total number of scenarios to sample (includes already sampled scenarios)
-numbScen <- 1005000
+numbScen <- 1050000
 
 ## Packages
 require(tictoc)
@@ -20,6 +20,7 @@ require(doParallel)
 library(fst)
 library(rprojroot)
 library(magrittr)
+library(stringr)
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
@@ -96,12 +97,12 @@ scens_sampledbas <- allscens[DAMBAS_ID08ext=='60808111301',] #All scenarios that
 
 #First sample number of dams, then sample dams
 tic()
-cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recommended number of cores
+cl <- parallel::makeCluster(1) #make cluster based on recommended number of cores
 on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
 DCIscens <- foreach(i=scen_numdams, 
-                    .packages = c("data.table", "magrittr")) %dopar% {
+                    .packages = c("data.table", "magrittr", "stringr")) %dopar% {
                       
                       scendams <- FutDams[, .SD[sample(.N, i, FALSE, NULL)]] %>% #Sample nsamp dams throughout brazil
                         setorder(DAMID) %>%
@@ -110,11 +111,17 @@ DCIscens <- foreach(i=scen_numdams,
                       
                       ndams_sampledbas <- scendams[DAMBAS_ID08ext == '60808111301', 
                                length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
+                      
                       selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
+                      print(selectscen_sampledbas)
+                      length(selectscen_sampledbas)
+                      
+                      
+                    if (length(selectscen_sampledbas) != 0 | ndams_sampledbas == 0) {
                       scendams[DAMBAS_ID08ext == '60808111301',
                                DamIDs := selectscen_sampledbas] %>%
                         .[, DAMBAS_ID08ext := NULL]
-
+                      
                       #head(allscens)
                       return(
                         allscens[scendams] %>% #Match with specific scenario DCI based on list of dams 
@@ -127,7 +134,12 @@ DCIscens <- foreach(i=scen_numdams,
                                    NFutLHP = sum(LHPnum, na.rm=T),
                                    NFreeDammed = sum(prevfree, na.rm=T),
                                    scenIDs = paste(scenbasin, collapse=','))]
-                      )} %>%
+                      )
+                    } 
+                      else {
+                        return(NULL)
+                      }
+                    } %>%
   do.call(rbind, .) %>% setDT
 stopCluster(cl)
 toc()
