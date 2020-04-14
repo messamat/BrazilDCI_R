@@ -23,17 +23,9 @@ NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 ################################################################################
 #Import scenarios
 nationalfiles <- list.files(path=resdir, pattern="NationalScen_DCIp_.*[.]fst")
-NationalScenarios_sub <- read.fst(file.path(resdir, nationalfiles[1])) %>%
-  setDT %>%
-  unique %>% #Only keep unique scenarios (mostly removes the multiple scenarios with all dams or no dams)
-  .[substr(scenIDs, 1,2) != 'NA',]
-
 NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
   setDT %>%
-  unique %>%
-  rbind(NationalScenarios_sub)
-
-write.fst(NationalScenarios, file.path(resdir, paste0("NationalScen_DCIp_", Sys.Date(), "_all.fst")))
+  unique 
 
 ################################################################################
 
@@ -49,8 +41,17 @@ print('Number and stats on least-optimal scenarios:')
 nrow(Worst)
 summary(Worst)
 
+## Define the window of future demands
+CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
+
+DemandLow <- 120 - CurrentGen_GW
+DemandHigh <- 141 - CurrentGen_GW
+
+BestDemand <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <= DemandHigh, 1:7]
+WorstDemand <- Worst[Worst$AddCapacity/1000 >= DemandLow & Worst$AddCapacity/1000 <= DemandHigh, 1:7]
+
 # Plot 6 (DCI loss Vs Capacity)
-tiff(filename = file.path(resdir, "Figure6.tiff"),
+tiff(filename = file.path(resdir, paste0("Figure6", Sys.date(), ".tiff")),
      height = 2396, width = 3800, res = 300, compression = c("lzw"))
 par(oma = c(8, 8.5, 7, 2), mar = c(0.5, 0, 0, 0), bty = "n")
 
@@ -104,15 +105,6 @@ points(Best$AddCapacity/1000, Best$NatAverageDCI,
 
 
 ## Select the best and worst scenarios that fall inside thresholds of future demands
-
-## Define the window of future demands
-CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
-
-DemandLow <- 120 - CurrentGen_GW
-DemandHigh <- 141 - CurrentGen_GW
-
-BestDemand <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <= DemandHigh, 1:7]
-WorstDemand <- Worst[Worst$AddCapacity/1000 >= DemandLow & Worst$AddCapacity/1000 <= DemandHigh, 1:7]
 
 ## Organize data for boxplot 1 (numbers)
 boxplot(BestDemand$NFutSHP, BestDemand$NFutLHP, WorstDemand$NFutSHP, WorstDemand$NFutLHP,
@@ -208,40 +200,31 @@ BestScens_damIDs <-  melt(BestScens, id.vars='optimizedID',
   .[, scenbasin := as.integer(scenbasin)] %>%
   merge(., allscens[, .(DAMBAS_ID08ext, scenbasin, DamIDs)],
         by=c('DAMBAS_ID08ext', 'scenbasin'), all.y=F) %>%
-  .[, list(DamIDs = toString(DamIDs)),
+  .[!is.na(DamIDs), list(DamIDs = toString(DamIDs)),
     by = optimizedID] %>%
-  setorder(optimizedID)
+  setorder(optimizedID) 
 
-orphaned <- which(!(1:185 %in% BestScens_damIDs$optimizedID))
-check <- BestScens[orphaned,] %>%
-  .[, optimizedID := orphaned] %>%
-  melt(id.vars='optimizedID', 
-       variable.name = "DAMBAS_ID08ext", 
-       value.name = "scenbasin") %>%
-  .[scenbasin != 0, ] %>%
-  .[, scenbasin := as.integer(scenbasin)] %>%
-  merge(allscens[, .(DAMBAS_ID08ext, scenbasin, DamIDs)],
-        by=c('DAMBAS_ID08ext', 'scenbasin'), all.y=F)
+Best_damIDs <- cbind(Best[BestScens_damIDs$optimizedID, -'scenIDs', with=FALSE], 
+                     BestScens_damIDs)
 
-
-
-#%>%
-cbind(Best, .)
-
-
-
-
-
-
-
-
-
+# orphaned <- which(!(1:176 %in% BestScens_damIDs$optimizedID))
+# check <- BestScens[orphaned,] %>%
+#   .[, optimizedID := orphaned] %>%
+#   melt(id.vars='optimizedID', 
+#        variable.name = "DAMBAS_ID08ext", 
+#        value.name = "scenbasin") %>%
+#   .[scenbasin != 0, ] %>%
+#   .[, scenbasin := as.integer(scenbasin)]%>%
+#   merge(allscens[, .(DAMBAS_ID08ext, scenbasin, DamIDs)],
+#         by=c('DAMBAS_ID08ext', 'scenbasin'), all.x=T, all.y=F)
 
 
 ## Write a csv with the dataset
-BestDemandPrint <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <= DemandHigh, 1:8]
-OptimalDamPrint <- BestDemandPrint[,2:8]
+BestDemandPrint <- Best_damIDs[Best_damIDs$AddCapacity/1000 >= DemandLow & 
+                                 Best_damIDs$AddCapacity/1000 <= DemandHigh,]
+OptimalDamPrint <- BestDemandPrint[,-'optimizedID', with=F] %>%
+  setorder('AddCapacity')
 colnames(OptimalDamPrint) <- c("National average DCI", "Capacity gain (GW)", "N future dams",
                                "N future SHPs", "N future LHPs", "N free basins lost", "DamIDs")
-
-write.csv(OptimalDamPrint, file = "Supplement_OptimalPortifolios.csv")
+write.csv(OptimalDamPrint, 
+          file = file.path(resdir, "Supplement_OptimalPortifolios.csv"))

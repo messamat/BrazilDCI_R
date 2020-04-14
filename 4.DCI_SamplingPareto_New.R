@@ -113,14 +113,12 @@ DCIscens <- foreach(i=scen_numdams,
                                length(str_split(string=DamIDs, pattern='[,]\\s*', simplify=T))]
                       
                       selectscen_sampledbas <- scens_sampledbas[ndams==ndams_sampledbas,][sample(.N, 1), DamIDs]
-                      print(selectscen_sampledbas)
-                      length(selectscen_sampledbas)
-                      
                       
                     if (length(selectscen_sampledbas) != 0 | ndams_sampledbas == 0) {
                       scendams[DAMBAS_ID08ext == '60808111301',
                                DamIDs := selectscen_sampledbas] %>%
-                        .[, DAMBAS_ID08ext := NULL]
+                        .[, DAMBAS_ID08ext := NULL] %>%
+                        setkey(DamIDs) 
                       
                       #head(allscens)
                       return(

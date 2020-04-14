@@ -75,19 +75,19 @@ cl <- parallel::makeCluster(bigstatsr::nb_cores()) #make cluster based on recomm
 on.exit(stopCluster(cl))
 doParallel::registerDoParallel(cl)
 
-DCIsentivity <- foreach(j=allpass[,.I], #basinList, ## Loop over basins
-                        .packages = c("data.table", "Rcpp", "RcppAlgos", "magrittr", 'plyr','fst', 'igraph')) %dopar% {
-                          
-                          overwrite=FALSE
-                          outf <-  file.path(outdir_sensitivity, paste0('DCIsensitivity_', paste(allpass[j],collapse='_'), '.fst'))
-                          
-                          if (!file.exists(outf) | overwrite==TRUE) {
-                            DCIpasscen <- DCI_bybasscen(netdt = NetworkBRAZIL,
-                                                        damformatdt = dampassformat(damdt = DamAttributes, 
-                                                                                    pasvec = unlist(allpass[j])),
-                                                        scencol = 'scenario')
-                            write.fst(DCIpasscen, outf)
+DCIsensitivity <- foreach(j=allpass[,.I], #basinList, ## Loop over basins
+                          .packages = c("data.table", "Rcpp", "RcppAlgos", "magrittr", 'plyr','fst', 'igraph')) %dopar% {
+                            
+                            overwrite=FALSE
+                            outf <-  file.path(outdir_sensitivity, paste0('DCIsensitivity_', paste(allpass[j],collapse='_'), '.fst'))
+                            
+                            if (!file.exists(outf) | overwrite==TRUE) {
+                              DCIpasscen <- DCI_bybasscen(netdt = NetworkBRAZIL,
+                                                          damformatdt = dampassformat(damdt = DamAttributes, 
+                                                                                      pasvec = unlist(allpass[j])),
+                                                          scencol = 'scenario')
+                              write.fst(DCIpasscen, outf)
+                            }
                           }
-                        }
 stopCluster(cl)
 toc()

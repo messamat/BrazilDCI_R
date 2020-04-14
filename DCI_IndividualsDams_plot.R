@@ -66,7 +66,6 @@ legend(x = 200, y = -47, pch = c(21), legend = c("Planned SHP", "Planned LHP"), 
 dev.off()
 
 
-
 ################################################################################################################
 #####################################  Some Statistics  ########################################################
 RankedDams$Capacity
@@ -131,11 +130,14 @@ cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$
 # 
 # }
 # 
-# ## Organize order and headers
-# OrderDams <- data.frame(RankedDams$DamRank, RankedDams$Type, RankedDams$ID, RankedDams$Name, round(RankedDams$Capacity, digits = 1),
-#                         round(RankedDams$DCIMeanDiff, digits = 1), round(RankedDams$DCIDownLim, digits = 1), round(RankedDams$DCIUppLim, digits = 1),
-#                         Lat, Long)
-# colnames(OrderDams) <- c("Rank", "Type",  "DamID", "Name", "Capacity(MW)", "Mean effect on basin's DCI", "Lower limit", "Upper limit", "Latitude", "Longitude")
-# 
-# 
-# write.csv(OrderDams, file = "Supplement_FutureDamRank.csv")
+## Organize order and headers
+numcols <- names(RankedDams)[sapply(RankedDams, is.numeric)]
+OrderDams <- RankedDams[, (numcols) := lapply(.SD, function(x) round(x, digits = 2)), 
+                        .SDcols=numcols] %>%
+  setorder(DCIMeanDiff) %>%
+  .[, .(DamRank, Type, Name, DAMID, Capacity, DCIMeanDiff, DCIUppLim, DCIDownLim)] %>%
+  setnames(c("Rank", "Type", "Name",  "DamID", "Capacity(MW)",
+             "Mean effect on basin's DCI", 
+             "Upper limit", "Lower limit"))
+
+write.csv(OrderDams, file = file.path(resdir, "Supplement_FutureDamRank.csv"))

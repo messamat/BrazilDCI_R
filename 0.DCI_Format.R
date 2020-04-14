@@ -114,8 +114,3 @@ setnames(DamAttributes, 'HYBAS_ID08ext', 'DAMBAS_ID08ext')
 
 write.fst(DamAttributes, file.path(resdir, 'DamAttributes.fst'))
 write.fst(NetworkBRAZIL, file.path(resdir, 'NetworkBRAZIL.fst'))
-
-
-
-
-
