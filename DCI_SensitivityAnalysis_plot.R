@@ -1,9 +1,3 @@
-library(rprojroot)
-library(magrittr)
-library(data.table)
-library(fst)
-library(plyr)
-library(ggplot2)
 
 # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))

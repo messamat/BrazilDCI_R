@@ -2,14 +2,6 @@
 ################ Plot PARETO and select OPTIMAL and NON-OPTIMAL scenarios #################################
 ###########################################################################################################
 
-## Load packages
-library(magrittr)
-library(stringr)
-library(rPref)
-library(data.table)
-library(fst)
-library(rprojroot)
-
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
@@ -51,7 +43,7 @@ BestDemand <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <=
 WorstDemand <- Worst[Worst$AddCapacity/1000 >= DemandLow & Worst$AddCapacity/1000 <= DemandHigh, 1:7]
 
 # Plot 6 (DCI loss Vs Capacity)
-tiff(filename = file.path(resdir, paste0("Figure6", Sys.date(), ".tiff")),
+tiff(filename = file.path(resdir, paste0("Figure6", Sys.Date(), ".tiff")),
      height = 2396, width = 3800, res = 300, compression = c("lzw"))
 par(oma = c(8, 8.5, 7, 2), mar = c(0.5, 0, 0, 0), bty = "n")
 

@@ -12,8 +12,7 @@ DCIfunc <- DCIp_opti
 # DCIfunc <- DCId_opti
 
 ## Packages
-require(tictoc)
-require(plyr)
+
 
 # ## Import network and dams dataset
 # DamAttributesCrude <- read.csv("damattributes.txt", header = T)

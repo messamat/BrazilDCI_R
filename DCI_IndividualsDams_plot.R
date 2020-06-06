@@ -1,16 +1,13 @@
 #Purpose: PLOT DCI Loss individual future dams VS Capacity 
 
-library(data.table)
-library(fst)
-library(rprojroot)
-library(magrittr)
-
 #Set folder structure
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
 #Import data
+DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
+
 RankedDams <- read.fst(file.path(resdir, 
                                  list.files(path=resdir, pattern='SamplingIndividualDams_results.*[.]fst'))) %>%
   setDT %>%
@@ -134,10 +131,11 @@ cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$
 numcols <- names(RankedDams)[sapply(RankedDams, is.numeric)]
 OrderDams <- RankedDams[, (numcols) := lapply(.SD, function(x) round(x, digits = 2)), 
                         .SDcols=numcols] %>%
-  setorder(DCIMeanDiff) %>%
   .[, .(DamRank, Type, Name, DAMID, Capacity, DCIMeanDiff, DCIUppLim, DCIDownLim)] %>%
+  merge(DamAttributes[,.(DAMID, NEAR_X, NEAR_Y)], by='DAMID', all.y=F) %>%
+  setorder(DCIMeanDiff) %>%
   setnames(c("Rank", "Type", "Name",  "DamID", "Capacity(MW)",
              "Mean effect on basin's DCI", 
-             "Upper limit", "Lower limit"))
-
+             "Upper limit", "Lower limit",
+             "X_Sirgas", "Y_Sirgas"))
 write.csv(OrderDams, file = file.path(resdir, "Supplement_FutureDamRank.csv"))

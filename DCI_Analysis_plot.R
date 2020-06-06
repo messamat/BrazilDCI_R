@@ -5,14 +5,7 @@
 
 
 ## Packages
-library(tictoc)
-library(plyr)
-library(data.table)
-library(rprojroot)
-library(fst)
-require(bigstatsr)
-require(parallel)
-require(doParallel)
+
 
 # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))

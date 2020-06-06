@@ -12,15 +12,7 @@
 numbScen <- 1050000
 
 ## Packages
-require(tictoc)
-require(plyr)
-require(bigstatsr)
-require(parallel)
-require(doParallel)
-library(fst)
-library(rprojroot)
-library(magrittr)
-library(stringr)
+
 
 # # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))

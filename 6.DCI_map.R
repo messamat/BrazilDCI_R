@@ -11,12 +11,7 @@
 #########################################################################################################
 
 ## Upload packages
-library(rprojroot)
-require(rgdal)
-require(maps)
-require(RColorBrewer)
-require(sp)
-require(zoom)
+
 
 ## Import network and dams dataset (alternative)
 rootdir <- find_root(has_dir("Shapes"))

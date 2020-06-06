@@ -2,15 +2,13 @@
 #Creation date: 
 #Purpose: Functions to compute DCI for a given river basin
 
-library(igraph) # library graph theory
-library(data.table)
-library(plyr)
-library(magrittr)
-library(stringr)
-library(RcppAlgos)
 
+#Define directory structure
+rootdir <- find_root(has_dir("src"))
+resdir <- file.path(rootdir, "results")
+datadir <- file.path(rootdir, "data")
+dcigdb <- file.path(resdir, 'dci.gdb')
 
-##########################
 
 #DCI for potadromous species
 DCIp_opti3 <- function(d2, d3, print = NULL){
@@ -172,7 +170,7 @@ DCId_opti <- function(d2, d3, print = NULL){
 
 ##########################
 # For troubleshooting
-##########################
+#########################
 # library(rprojroot)
 # library(microbenchmark)
 # rootdir <- find_root(has_dir("src"))
@@ -186,7 +184,7 @@ DCId_opti <- function(d2, d3, print = NULL){
 # d2 <-  DamAttributes[DAMBAS_ID08ext ==j, list(id1 = DownSeg, id2 = UpSeg, pass = Allcurrent)]
 # 
 # microbenchmark(
-#   DCIp_opti3(d2, d3, print = NULL),
+#   DCId_opti(d2, d3, print = NULL),
 #   DCIp_opti5(d2, d3, print = NULL),
 #   times=50L
 # )

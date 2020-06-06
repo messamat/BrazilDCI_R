@@ -11,12 +11,6 @@
 
 packrat::status()
 
-## Packages
-library(tictoc)
-library(plyr)
-library(fst)
-library(data.table)
-library(rprojroot)
 
 # Import network and dams dataset (Mathis folder structure)
 rootdir <- find_root(has_dir("src"))
