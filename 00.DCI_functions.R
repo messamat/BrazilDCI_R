@@ -6,6 +6,7 @@
 #Define directory structure
 rootdir <- find_root(has_dir("src"))
 resdir <- file.path(rootdir, "results")
+figdir <- file.path(resdir, 'figures')
 datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
@@ -129,7 +130,7 @@ DCIp_opti5 <- function(d2, d3, print = NULL){
 #DCI for diadromous species
 #Calculate connectivity in terms of the probability that a fish can move in both directions between 
 #the mouth of the river and another section of the river network
-DCId_opti <- function(d2, d3, print = NULL){
+DCIi_opti <- function(d2, d3, print = NULL){
   #Main difference with DCIp is that not passability is not assessed for all combinations of segments but between
   #mouth segment and all segments (included itself) [and only one l_i/L ratio is used in the calculation]
   
@@ -184,7 +185,7 @@ DCId_opti <- function(d2, d3, print = NULL){
 # d2 <-  DamAttributes[DAMBAS_ID08ext ==j, list(id1 = DownSeg, id2 = UpSeg, pass = Allcurrent)]
 # 
 # microbenchmark(
-#   DCId_opti(d2, d3, print = NULL),
+#   DCIi_opti(d2, d3, print = NULL),
 #   DCIp_opti5(d2, d3, print = NULL),
 #   times=50L
 # )

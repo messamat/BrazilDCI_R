@@ -1,17 +1,13 @@
-
-
-########################################### Directory structure ########################################
+#Import packages
 source('00.DCI_packages.R')
-source('DCIAnalysis.R')
+#Import directory structure and functions
+source('00.DCI_functions.R')
 
-## Import network and dams dataset (alternative)
-# rootdir <- find_root(has_dir("PythonOutputs"))
-# datadir <- file.path(rootdir, "PythonOutputs")
-# dcigdb <- file.path(datadir, 'dci.gdb')
+## Import network and dams dataset
 NetworkBRAZILCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 DamAttributesCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
 
-## Remove the dams that have NAs from the dataset
+## Remove the dams that have NAs as their basin ID from the dataset
 DamAttributesCrude <- DamAttributesCrude[!is.na(DamAttributesCrude$HYBAS_ID08),]
 
 #------ DEAL WITH COASTAL DRAINAGES ------
