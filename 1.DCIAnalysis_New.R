@@ -17,7 +17,7 @@ source('00.DCI_functions.R')
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
 NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
-compute_DCIscenarios(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
+compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   #Base + for-loop way to compute for scenarios
   tic()
   ## Create a vector with unique basin IDs

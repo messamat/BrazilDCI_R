@@ -8,12 +8,12 @@ source('00.DCI_packages.R')
 source('00.DCI_functions.R')
 
 #Import formatted data
+resdir <- file.path(resdir, 'results_withoutdcigdb_20200606')
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
-NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
 ################################################################################
-#Import scenarios
 plotPareto <- function(DCIname) {
+  #Import scenarios
   nationalfiles <- list.files(path=resdir,
                               pattern=paste0("NationalScen_", DCIname, "_.*[.]fst"))
   NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
@@ -21,6 +21,35 @@ plotPareto <- function(DCIname) {
     unique 
   
   ################################################################################
+  #Assess whether reaching Pareto frontier
+  nscen_seq <- c(seq(1, nrow(NationalScenarios), 100), nrow(NationalScenarios))
+  growfrontier_dt <- lapply(nscen_seq,
+                            function(nscen) {
+                              print(nscen)
+                              subscens <- NationalScenarios[sample(.N, nscen), -'scenIDs', with=F]
+                              sub_best <- psel(subscens, 
+                                               pref = high(subscens$AddCapacity) * 
+                                                 high(subscens$NatAverageDCI)) %>%
+                                .[, nscen := nscen]
+                              return(sub_best)
+                            }
+  ) %>%
+    rbindlist
+  growfrontier_dt[, AddCapacity_int := round(AddCapacity)]
+  
+  growfrontierdiff <- growfrontier_dt[
+    , DCIdiff := (max(NatAverageDCI) - NatAverageDCI)/max(NatAverageDCI),
+    by=AddCapacity_int] %>%
+    .[, list(meandcidiff = mean(DCIdiff)), by=nscen]
+  
+  ggplot(growfrontierdiff, aes(x=nscen, y=meandcidiff)) + 
+    geom_point()
+  
+  
+  
+  ggplot(growfrontier_dt, aes(x=AddCapacity, y=NatAverageDCI, color=nscen)) + 
+    geom_point(alpha=1/5) + 
+    scale_color_distiller(palette='Spectral')
   
   Best <- psel(NationalScenarios, 
                pref = high(NationalScenarios$AddCapacity) * high(NationalScenarios$NatAverageDCI))
