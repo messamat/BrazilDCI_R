@@ -19,8 +19,8 @@ source('00.DCI_functions.R')
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
 NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
-sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
-  DCIfunc <- DCIfunction
+sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname, 
+                             minlazy, nsamples) {
   
   #Create output directory
   outdir_permut = file.path(resdir, paste0('outpermut_basins', DCIname))
@@ -54,10 +54,10 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   
   #### Parameters to run permutations-based DCI ####
   #minimum number of dams in basin at which the function starts sampling permutation scenarios (for speed/memory sake)
-  minlazy <- 23 
+  #minlazy
   #number of seed scenarios to sample from lazy permutation. The actual number of scenario pairs that will actually 
   #be evluated will often be at least >5-20 times more than that number
-  nsamples <- 10000
+  #nsamples <- 10000
   
   ############## LAUNCH ANALYSIS ####################
   tic("total")
@@ -70,7 +70,8 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   DCIscens <-
     foreach(j=basinList, #basinList, ## Loop over basins
             .packages = c("data.table", "Rcpp", "RcppAlgos",
-                          "magrittr", 'plyr','tcltk', 'fst')) %dopar% {
+                          "magrittr", 'plyr','tcltk', 'fst'),
+            .export = 'lazyExpandGrid') %dopar% {
                             
                             ## filter attributes of the basin j         
                             NetX <- NetworkBRAZIL[HYBAS_ID08ext == j, ]
@@ -177,15 +178,20 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   out_fst = file.path(resdir, 
                       paste0('SamplingIndividualDams_results_', DCIname, 
                              Sys.Date(), '.fst'))
-  write.fst(big_data, out_fast)
+  write.fst(big_data, out_fst)
 }
 
 sample_indivdams(DamAttributes = DamAttributes,
                  NetworkBRAZIL = NetworkBRAZIL,
                  DCIfunc = DCIp_opti5,
-                 DCIname = 'DCIp')
+                 DCIname = 'DCIp',
+                 minlazy=21,
+                 nsamples=10000)
 
 sample_indivdams(DamAttributes = DamAttributes,
                  NetworkBRAZIL = NetworkBRAZIL,
                  DCIfunc = DCIi_opti,
-                 DCIname = 'DCIi')
+                 DCIname = 'DCIi',
+                 minlazy=21,
+                 nsamples=10000)
+

@@ -164,7 +164,7 @@ assess_migratoryfragment <- function(DCIname) {
     SpBasins <- unique(spIDvec$HYBAS_ID)
     
     # Get the DCI's for such basins
-    SpDCIDF <- resuDCI_L8[resuDCI_L8$HYBAS_ID %in% SpBasins, ]
+    SpDCIDF <- resuDCI_L8[resuDCI_L8$DAMBAS_ID %in% SpBasins, ]
     
     
     ## Fill out a table with average DCI and CI for current and future scenarios

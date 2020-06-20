@@ -10,6 +10,9 @@ figdir <- file.path(resdir, 'figures')
 datadir <- file.path(rootdir, "data")
 dcigdb <- file.path(resdir, 'dci.gdb')
 
+if (!file.exists(figdir)) {
+  dir.create(figdir)
+}
 
 #DCI for potadromous species
 DCIp_opti3 <- function(d2, d3, print = NULL){
@@ -25,7 +28,7 @@ DCIp_opti3 <- function(d2, d3, print = NULL){
   OBS: d2 and d3 must have the same segment names (ID)
   d = edges; vertices = nodes"
   
-  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  graph <- igraph::graph.data.frame(d2, directed = F); #plot(graph)
   
   #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
   d3[,l_L := l/sum(l)] %>%
@@ -44,7 +47,7 @@ DCIp_opti3 <- function(d2, d3, print = NULL){
       setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>% #Convert to data.table and rename columns
       merge(d3, by.x='i', by.y='id', all.y=F) %>% #Get size of segments (may be sped up with key-based match)
       merge(d3, by.x='k', by.y='id', all.y=F) %>%
-      .[, 100 * l_L.x * l_L.y * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
+      .[, 100 * l_L.x * l_L.y * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
         by=seq_len(nrow(.))]
   }
 
@@ -64,8 +67,6 @@ DCIp_opti4 <- function(d2, d3, print = NULL){
   	
   OBS: d2 and d3 must have the same segment names (ID)	
   d = edges; vertices = nodes"	
-  
-  require(igraph)	
   
   graph <- graph.data.frame(d2, directed = F); #plot(graph)	
   
@@ -101,7 +102,7 @@ DCIp_opti5 <- function(d2, d3, print = NULL){
   OBS: d2 and d3 must have the same segment names (ID)
   d = edges; vertices = nodes"
   
-  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  graph <- igraph::graph.data.frame(d2, directed = F); #plot(graph)
   
   #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
   d3[,l_L := l/sum(l)] %>%
@@ -119,7 +120,7 @@ DCIp_opti5 <- function(d2, d3, print = NULL){
       setkey(i) %>%  .[d3] %>%
       setkey(k) %>%  .[d3] %>%
       .[!is.na(i)] %>%
-      .[, 100 * l_L * i.l_L * prod(shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
+      .[, 100 * l_L * i.l_L * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
         by=1:nrow(.)]
     
     #Compute DCI by sum connectivity for full matrix of pairwise combination 
@@ -145,8 +146,7 @@ DCIi_opti <- function(d2, d3, print = NULL){
   OBS: d2 and d3 must have the same segment names (ID)
   d = edges; vertices = nodes"
   
-  require(igraph)
-  graph <- graph.data.frame(d2, directed = F); #plot(graph)
+  graph <- igraph::graph.data.frame(d2, directed = F); #plot(graph)
   
   #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
   d3$l_L <- d3$l/sum(d3$l)
@@ -160,7 +160,7 @@ DCIi_opti <- function(d2, d3, print = NULL){
   DCImatd <- function(x) {
     #Compute connectivity for all unique pairs of segments in basin (for diadromous species)
     #Note: when from= and to= are the same in shortest_paths, returns an empty numeric that, when fed to prod, returns 1
-    return(prod(shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass) *
+    return(prod(igraph::shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass) *
              d3[d3$id==x[2],'l_L'][[1]] *
              100) 
   }

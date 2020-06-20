@@ -21,20 +21,20 @@ compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname)
   #Base + for-loop way to compute for scenarios
   tic()
   ## Create a vector with unique basin IDs
-  basinList <- as.character(unique(DamAttributes$HYBAS_ID08ext))
+  basinList <- as.character(unique(DamAttributes$DAMBAS_ID08ext))
   
   ## Create a matrix of basins and DCIs               
   DCI_BRAZIL_L8 <- matrix(NA, nrow = length(basinList), ncol = 7)
-  colnames(DCI_BRAZIL_L8) <- c("HYBAS_ID", "All_curr", "All_fut", "SHP_curr", "SHP_fut", "LHP_curr", "LHP_fut")
+  colnames(DCI_BRAZIL_L8) <- c("DAMBAS_ID", "All_curr", "All_fut", "SHP_curr", "SHP_fut", "LHP_curr", "LHP_fut")
   DCI_BRAZIL_L8 [ , 1] <- as.numeric(substr(basinList, 1, nchar(basinList)-1))
   
   ## Create two matrixes to fill with dam atributes of each basin (N dams, MW production)
   basinNDams_L8 <- matrix(NA, nrow = length(basinList), ncol = 7)
-  colnames(basinNDams_L8) <- c("HYBAS_IDext", "N_All_curr", "N_All_fut", "N_SHP_curr", "N_SHP_fut", "N_LHP_curr", "N_LHP_fut")
+  colnames(basinNDams_L8) <- c("DAMBAS_IDext", "N_All_curr", "N_All_fut", "N_SHP_curr", "N_SHP_fut", "N_LHP_curr", "N_LHP_fut")
   basinNDams_L8 [ , 1] <- as.numeric(substr(basinList, 1, nchar(basinList)-1))
   
   basinMWDams_L8 <- matrix(NA, nrow = length(basinList), ncol = 7)
-  colnames(basinMWDams_L8) <- c("HYBAS_IDext", "MW_All_curr", "MW_All_fut", "MW_SHP_curr", "MW_SHP_fut", "MW_LHP_curr", "MW_LHP_fut")
+  colnames(basinMWDams_L8) <- c("DAMBAS_IDext", "MW_All_curr", "MW_All_fut", "MW_SHP_curr", "MW_SHP_fut", "MW_LHP_curr", "MW_LHP_fut")
   basinMWDams_L8 [ , 1] <- as.numeric(substr(basinList, 1, nchar(basinList)-1))
   
   ## Possible Scenarios of time-period
@@ -64,7 +64,7 @@ compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname)
       
       ## filter attributes of the basin j         
       BasinX <- NetworkBRAZIL[NetworkBRAZIL$HYBAS_ID08ext == basinList[j], ]
-      DamX <- DamAttributes[DamAttributes$HYBAS_ID08ext == basinList[j], ]
+      DamX <- DamAttributes[DamAttributes$DAMBAS_ID08ext == basinList[j], ]
       
       # Create a sequence ranging from 1 to the maximum number of segments
       #Lsegments <- min(unique(BasinX$batNetID))
@@ -97,7 +97,7 @@ compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname)
         Situation <- DamX$ESTAGIO_1
         ID_number <- DamX$TARGET_FID
         ID_name <- DamX$NOME
-        Basin <- DamX$HYBAS_ID08ext
+        Basin <- DamX$DAMBAS_ID08ext
         
         ## Put these data in a data frame with all necessary information about the edges
         EdgesData <- data.frame(DowSeg, UpSeg, Type, Situation, ID_number, ID_name, Basin)
@@ -113,10 +113,12 @@ compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname)
         passVec[PresentDams] <- 0.1
         
         # List of edges and passability
-        d2 = data.frame (id1 = EdgesData[, 1], id2 = EdgesData[, 2], pass = passVec)
+        d2 = data.frame (id1 = EdgesData[, 1], id2 = EdgesData[,2], pass = passVec) %>%
+          setDT
         
         # attributes of nodes; node sizes
-        d3 = data.frame(id = listSeg, l = listLengths)
+        d3 = data.frame(id = listSeg, l = listLengths) %>%
+          setDT
         
         # Run DCI analyses for the basin
         DCI <- DCIfunc(d2, d3, print = F)
@@ -138,11 +140,11 @@ compute_DCIscenarios <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname)
   
   ## Create a csv file with the output of DCI analysis for all the scenarios
   write.csv(DCI_BRAZIL_L8, 
-            file = filepath(resdir, paste0("DCI_Brazil_L8_", DCIname, ".csv")))
+            file = file.path(resdir, paste0("DCI_Brazil_L8_", DCIname, ".csv")))
   write.csv(basinNDams_L8, 
-            file = filepath(resdir, paste0("basinNDams_L8_", DCIname, ".csv")))
+            file = file.path(resdir, paste0("basinNDams_L8_", DCIname, ".csv")))
   write.csv(basinMWDams_L8, 
-            file = filepath(resdir, paste0("basinMWDams_L8_", DCIname, ".csv")))
+            file = file.path(resdir, paste0("basinMWDams_L8_", DCIname, ".csv")))
 }
 
 

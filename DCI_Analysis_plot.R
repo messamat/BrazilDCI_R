@@ -16,11 +16,11 @@ NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 DCIplot2 <- function(DCIname) {
   ## Import data
   resuDCI <- as.data.frame(read.csv(
-    filepath(resdir, paste0("DCI_Brazil_L8_", DCIname, ".csv", header = T))))
+    file.path(resdir, paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
   resuNDams <- as.data.frame(read.csv(
-    filepath(resdir, paste0("basinNDams_L8_", DCIname, ".csv", header = T))))
+    file.path(resdir, paste0("basinNDams_L8_", DCIname, ".csv")), header = T))
   resuMWDams <- as.data.frame(read.csv(
-    filepath(resdir, paste0("basinMWDams_L8_", DCIname, ".csv", header = T))))
+    file.path(resdir, paste0("basinMWDams_L8_", DCIname, ".csv")), header = T))
 
   ## Filter results of basins with both SHPs and LHPs in the future
   resuDCI_Both <- resuDCI[resuDCI$SHP_fut != 100 & resuDCI$LHP_fut != 100, ]
@@ -68,7 +68,7 @@ DCIplot2 <- function(DCIname) {
   PercLoss_Regul_LHP <- DCILoss_Regul_LHP/resuDCI_Regul$LHP_curr * 100
   
   # Export csv with the percentage change
-  PercChangeData <- data.frame(resuDCI$HYBAS_ID, PercLoss_All, PercLoss_SHP, PercLoss_LHP)
+  PercChangeData <- data.frame(resuDCI$DAMBAS_ID, PercLoss_All, PercLoss_SHP, PercLoss_LHP)
   colnames(PercChangeData) <- c("HYBAS_ID", "PercLoss_All", "PercLoss_SHP", "PercLoss_LHP")
   write.csv(PercChangeData, file = 
               file.path(resdir, paste0("DCI_Brazil_L8_Percentage", DCIname,".csv")))
@@ -212,234 +212,79 @@ DCIplot2 <- function(DCIname) {
   
   dev.off()
   
-  
-  
-  
-  
-  
-  
-  
-  
-  # ######################################### OLD PLOT - Basins occupied by both ###################################
-  # ##### Plot % change
-  # 
-  # 
-  # tiff(filename = "Figure2.tiff", height = 1656, width = 3200, res = 300, compression = c("lzw"))
-  # 
-  # mat <- matrix(c(rep(1, times = 2), rep(2, times = 2), rep(3, times = 2)), ncol = 3, nrow = 2, byrow = F)
-  # layout(mat = mat, widths = c(4, 4, 4), heights = c(rep(0.5, times = 3)))
-  # 
-  # # Par
-  # par (oma = c(5.5, 6, 6.5, 4.0), mar = c(0.5, 0, 0, 0), bty = "n")
-  # 
-  # par(bty = "n")
-  # 
-  # ### Plot data for all basins
-  # 
-  # # Position dam treatments in the x axis
-  # treatment <- rep(0.5, times = dim(resuDCI)[1])
-  # 
-  # plot(x = treatment, y = PercLoss_All, ylim = c(-100, 0), xlim = c(0, 1.8), type = "n", ylab = "",
-  #      xlab = "", xaxt = "n", yaxt = "n")
-  # 
-  # # Plot poins (each one is a basin)
-  # points(x = treatment * 1, y = PercLoss_SHP, bg = "#8B000005", col = c("#42424220"), cex = 4.0, pch = 21)
-  # points(x = treatment * 2, y = PercLoss_LHP, bg = "#4876FF05", col = c("#42424220"), cex = 4.0, pch = 21)
-  # points(x = treatment * 3, y = PercLoss_All, bg = "#9400D305", col = c("#42424220"), cex = 4.0, pch = 21)
-  # 
-  # # Plot 95% CI
-  # UppCI_SHP <- quantile(PercLoss_SHP, 0.975, na.rm = T)
-  # LowCI_SHP <- quantile(PercLoss_SHP, 0.025, na.rm = T)
-  # UppCI_LHP <- quantile(PercLoss_LHP, 0.975, na.rm = T)
-  # LowCI_LHP <- quantile(PercLoss_LHP, 0.025, na.rm = T)
-  # UppCI_All <- quantile(PercLoss_All, 0.975, na.rm = T)
-  # LowCI_All <- quantile(PercLoss_All, 0.025, na.rm = T)
-  # 
-  # segments(y0 = UppCI_SHP, x0 = treatment * 1, 
-  #          y1 = LowCI_SHP, x1 = treatment * 1, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_LHP, x0 = treatment * 2, 
-  #          y1 = LowCI_LHP, x1 = treatment * 2, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_All, x0 = treatment * 3, 
-  #          y1 = LowCI_All, x1 = treatment * 3, lwd = 4.3, col = "black")
-  # 
-  # # Plot means
-  # points(x = treatment[1] * 1, y = mean(PercLoss_SHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 2, y = mean(PercLoss_LHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 3, y = mean(PercLoss_All), pch = "-", col = "black", cex = 13.0)
-  # 
-  # # Plot axes and labels
-  # axis(side = 2, at = c(0, -20, -40, -60, -80, -100), cex.axis = 2.5, line = - 3)
-  # axis(side = 1, at = c(treatment[1], treatment[1] * 2, treatment[1] * 3), labels = c("SHP", "LHP", "All"),
-  #      cex.axis = 2.5, line = 1, mgp = c(3, 1.7, 0))
-  # mtext("% change in river connectivity", side = 2, cex = 2.2, line = 1.7)
-  # #mtext("Predicted % change in river connectivity (DCI)", side = 2, cex = 2.0, line = 1.7)
-  # 
-  # mtext("All basins", side = 3, cex = 2.0, line = 1)
-  # mtext("A", side = 3, cex = 2.6, line = 2.9, at = 0.2)
-  # 
-  # 
-  # ### Plot data just for hydropower-free basin
-  # # Position dam treatments in the x axis
-  # treatment <- rep(0.5, times = dim(resuDCI_Free)[1])
-  # 
-  # plot(x = treatment, y = PercLoss_Free_All, ylim = c(-100, 0), xlim = c(0, 1.8), type = "n", ylab = "",
-  #      xlab = "", xaxt = "n", yaxt = "n")
-  # 
-  # # Plot poins (each one is a basin)
-  # points(x = treatment * 1, y = PercLoss_Free_SHP, bg = "#8B000005", col = c("#42424220"), cex = 4, pch = 21)
-  # points(x = treatment * 2, y = PercLoss_Free_LHP, bg = "#4876FF05", col = c("#42424220"), cex = 4, pch = 21)
-  # points(x = treatment * 3, y = PercLoss_Free_All, bg = "#9400D305", col = c("#42424220"), cex = 4, pch = 21)
-  # 
-  # # Plot 95% CI
-  # UppCI_Free_SHP <- quantile(PercLoss_Free_SHP, 0.975, na.rm = T)
-  # LowCI_Free_SHP <- quantile(PercLoss_Free_SHP, 0.025, na.rm = T)
-  # UppCI_Free_LHP <- quantile(PercLoss_Free_LHP, 0.975, na.rm = T)
-  # LowCI_Free_LHP <- quantile(PercLoss_Free_LHP, 0.025, na.rm = T)
-  # UppCI_Free_All <- quantile(PercLoss_Free_All, 0.975, na.rm = T)
-  # LowCI_Free_All <- quantile(PercLoss_Free_All, 0.025, na.rm = T)
-  # 
-  # segments(y0 = UppCI_Free_SHP, x0 = treatment * 1, 
-  #          y1 = LowCI_Free_SHP, x1 = treatment * 1, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_Free_LHP, x0 = treatment * 2, 
-  #          y1 = LowCI_Free_LHP, x1 = treatment * 2, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_Free_All, x0 = treatment * 3, 
-  #          y1 = LowCI_Free_All, x1 = treatment * 3, lwd = 4.3, col = "black")
-  # 
-  # # Plot means
-  # points(x = treatment[1] * 1, y = mean(PercLoss_Free_SHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 2, y = mean(PercLoss_Free_LHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 3, y = mean(PercLoss_Free_All), pch = "-", col = "black", cex = 13.0)
-  # 
-  # # Plot axes and labels
-  # axis(side = 1, at = c(treatment[1], treatment[1] * 2, treatment[1] * 3), labels = c("SHP", "LHP", "All"),
-  #      cex.axis = 2.5, line = 1, mgp = c(3, 1.7, 0))
-  # 
-  # mtext("Hydropower-free basins", side = 3, cex = 1.6, line = 1, at = treatment * 3 - 0.42)
-  # mtext("B", side = 3, cex = 2.6, line = 2.9, at = 0.2)
-  # 
-  # 
-  # ### Plot data just for basins with both SHPs and LHPs
-  # # Position dam treatments in the x axis
-  # treatment <- rep(0.5, times = dim(resuDCI_Both)[1])
-  # 
-  # plot(x = treatment, y = PercLoss_Both_All, ylim = c(-100, 0), xlim = c(0, 1.8), type = "n", ylab = "",
-  #      xlab = "", xaxt = "n", yaxt = "n")
-  # 
-  # # Plot poins (each one is a basin)
-  # points(x = treatment * 1, y = PercLoss_Both_SHP, bg = "#8B000005", col = c("#42424220"), cex = 4, pch = 21)
-  # points(x = treatment * 2, y = PercLoss_Both_LHP, bg = "#4876FF05", col = c("#42424220"), cex = 4, pch = 21)
-  # points(x = treatment * 3, y = PercLoss_Both_All, bg = "#9400D305", col = c("#42424220"), cex = 4, pch = 21)
-  # 
-  # # Plot 95% CI
-  # UppCI_Both_SHP <- quantile(PercLoss_Both_SHP, 0.975, na.rm = T)
-  # LowCI_Both_SHP <- quantile(PercLoss_Both_SHP, 0.025, na.rm = T)
-  # UppCI_Both_LHP <- quantile(PercLoss_Both_LHP, 0.975, na.rm = T)
-  # LowCI_Both_LHP <- quantile(PercLoss_Both_LHP, 0.025, na.rm = T)
-  # UppCI_Both_All <- quantile(PercLoss_Both_All, 0.975, na.rm = T)
-  # LowCI_Both_All <- quantile(PercLoss_Both_All, 0.025, na.rm = T)
-  # 
-  # segments(y0 = UppCI_Both_SHP, x0 = treatment * 1, 
-  #          y1 = LowCI_Both_SHP, x1 = treatment * 1, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_Both_LHP, x0 = treatment * 2, 
-  #          y1 = LowCI_Both_LHP, x1 = treatment * 2, lwd = 4.3, col = "black")
-  # segments(y0 = UppCI_Both_All, x0 = treatment * 3, 
-  #          y1 = LowCI_Both_All, x1 = treatment * 3, lwd = 4.3, col = "black")
-  # 
-  # # Plot means
-  # points(x = treatment[1] * 1, y = mean(PercLoss_Both_SHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 2, y = mean(PercLoss_Both_LHP), pch = "-", col = "black", cex = 13.0)
-  # points(x = treatment[1] * 3, y = mean(PercLoss_Both_All), pch = "-", col = "black", cex = 13.0)
-  # 
-  # # Plot axes and labels
-  # axis(side = 1, at = c(treatment[1], treatment[1] * 2, treatment[1] * 3), labels = c("SHP", "LHP", "All"),
-  #      cex.axis = 2.5, line = 1, mgp = c(3, 1.7, 0))
-  # 
-  # mtext("Basins with both", side = 3, cex = 1.6, line = 1, at = treatment * 2 - 0.07)
-  # mtext("C", side = 3, cex = 2.6, line = 2.9, at = 0.2)
-  # 
-  # 
-  # dev.off()
-  # 
-  # 
   ######################################################################################################
   ########################### Claculate some statistics for % change ###################################
   ######################################################################################################
   
-  ## Absolute change in overall DCI
-  mean(100 - resuDCI$All_curr)
-  sd(100 - resuDCI$All_curr)
+  message("Absolute change in overall DCI (mean, sd)")
+  message(mean(100 - resuDCI$All_curr))
+  message(sd(100 - resuDCI$All_curr))
   
-  ## Absolute change in SHP DCI
-  mean(100 - resuDCI$SHP_curr)
-  sd(100 - resuDCI$SHP_curr)
+  message("Absolute change in SHP DCI")
+  message(mean(100 - resuDCI$SHP_curr))
+  message(sd(100 - resuDCI$SHP_curr))
   
-  ## Absolute change in LHP DCI
-  mean(100 - resuDCI$LHP_curr)
-  sd(100 - resuDCI$LHP_curr)
+  message("Absolute change in LHP DCI")
+  message(mean(100 - resuDCI$LHP_curr))
+  message(sd(100 - resuDCI$LHP_curr))
   
-  ## Proportion of the current scenario between SHPs and LHPs
-  round(mean(100 - resuDCI$SHP_curr)/mean(100 - resuDCI$LHP_curr), digits = 0)
-  
-  
-  
-  ## Overall future % change values
-  mean(PercLoss_All)
-  sd(PercLoss_All)
-  min(PercLoss_All)
-  max(PercLoss_All)
-  
-  ## SHPs future % change values
-  mean(PercLoss_SHP)
-  sd(PercLoss_SHP)
-  min(PercLoss_SHP)
-  max(PercLoss_SHP)
-  
-  ## SHPs future % change values
-  mean(PercLoss_LHP)
-  sd(PercLoss_LHP)
-  min(PercLoss_LHP)
-  max(PercLoss_LHP)
+  message("Proportion of the current scenario between SHPs and LHPs")
+  message(round(mean(100 - resuDCI$SHP_curr)/mean(100 - resuDCI$LHP_curr), digits = 0))
   
   
+  message("Overall future % change values (mean, sd, min, max)")
+  message(mean(PercLoss_All))
+  message(sd(PercLoss_All))
+  message(min(PercLoss_All))
+  message(max(PercLoss_All))
   
-  ## Free-flowing All future % change values
-  mean(PercLoss_Free_All)
-  sd(PercLoss_Free_All)
-  min(PercLoss_Free_All)
-  max(PercLoss_Free_All)
+  message("SHPs future % change values")
+  message( mean(PercLoss_SHP))
+  message(sd(PercLoss_SHP))
+  message(min(PercLoss_SHP))
+  message(max(PercLoss_SHP))
   
-  ## Free-flowing SHPs future % change values
-  mean(PercLoss_Free_SHP)
-  sd(PercLoss_Free_SHP)
-  min(PercLoss_Free_SHP)
-  max(PercLoss_Free_SHP)
+  message("SHPs future % change values")
+  message(mean(PercLoss_LHP))
+  message(sd(PercLoss_LHP))
+  message(min(PercLoss_LHP))
+  message(max(PercLoss_LHP))
   
-  ## Free-flowing LHPs future % change values
-  mean(PercLoss_Free_LHP)
-  sd(PercLoss_Free_LHP)
-  min(PercLoss_Free_LHP)
-  max(PercLoss_Free_LHP)
+  message("Free-flowing All future % change values")
+  message(mean(PercLoss_Free_All))
+  message(sd(PercLoss_Free_All))
+  message(min(PercLoss_Free_All))
+  message(max(PercLoss_Free_All))
   
+  message("Free-flowing SHPs future % change values")
+  message(mean(PercLoss_Free_SHP))
+  message(sd(PercLoss_Free_SHP))
+  message(min(PercLoss_Free_SHP))
+  message(max(PercLoss_Free_SHP))
   
+  message("Free-flowing LHPs future % change values")
+  message(mean(PercLoss_Free_LHP))
+  message(sd(PercLoss_Free_LHP))
+  message(min(PercLoss_Free_LHP))
+  message(max(PercLoss_Free_LHP))
   
-  ## Basins with both SHPs future % change values
-  mean(PercLoss_Both_All)
-  sd(PercLoss_Both_All)
-  min(PercLoss_Both_All)
-  max(PercLoss_Both_All)
+  message("Basins with both SHPs future % change values")
+  message(mean(PercLoss_Both_All))
+  message(sd(PercLoss_Both_All))
+  message(min(PercLoss_Both_All))
+  message(max(PercLoss_Both_All))
   
-  ## Free-flowing SHPs future % change values
-  mean(PercLoss_Both_SHP)
-  sd(PercLoss_Both_SHP)
-  min(PercLoss_Both_SHP)
-  max(PercLoss_Both_SHP)
+  message("Free-flowing SHPs future % change values")
+  message(mean(PercLoss_Both_SHP))
+  message(sd(PercLoss_Both_SHP))
+  message(min(PercLoss_Both_SHP))
+  message(max(PercLoss_Both_SHP))
   
-  ## Free-flowing SHPs future % change values
-  mean(PercLoss_Both_LHP)
-  sd(PercLoss_Both_LHP)
-  min(PercLoss_Both_LHP)
-  max(PercLoss_Both_LHP)
-  
+  message("Free-flowing SHPs future % change values")
+  message(mean(PercLoss_Both_LHP))
+  message(sd(PercLoss_Both_LHP))
+  message(min(PercLoss_Both_LHP))
+  message(max(PercLoss_Both_LHP))
   
   
   ####################################################################################################################################
@@ -448,6 +293,7 @@ DCIplot2 <- function(DCIname) {
   ######################################  AND NUMBER OF POSSIBLE PORTIFOLIOS OF DAMS  ################################################
   ######################################        (INFORM METHOD SECTION)                   ############################################
   
+  basinList <- unique(DamAttributes$DAMBAS_ID08ext)
   ## Create an empty matrix
   LinearDistKm<- rep(NA, times = length(basinList))
   NPortifolios<- rep(NA, times = length(basinList))
@@ -457,7 +303,7 @@ DCIplot2 <- function(DCIname) {
     
     ## filter attributes of the basin j         
     BasinX <- NetworkBRAZIL[NetworkBRAZIL$HYBAS_ID08ext == basinList[j], ]
-    DamX <- DamAttributes[DamAttributes$HYBAS_ID08ext == basinList[j], ]
+    DamX <- DamAttributes[DamAttributes$DAMBAS_ID08ext == basinList[j], ]
     
     ## Linear distance
     LinearDist <- sum(BasinX$Shape_Length)
@@ -469,8 +315,10 @@ DCIplot2 <- function(DCIname) {
     
   }
   
-  mean(LinearDistKm)
-  sum(NPortifolios)
+  message("mean(LinearDistKm)")
+  message(mean(LinearDistKm))
+  message("sum(NPortifolios)")
+  message(sum(NPortifolios))
   
   ##################################################################################
   ############################ Plot difference #####################################
@@ -617,3 +465,6 @@ DCIplot2 <- function(DCIname) {
   
   dev.off()
 }
+
+DCIplot2('DCIp')
+DCIplot2('DCIi')

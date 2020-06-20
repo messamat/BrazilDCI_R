@@ -12,19 +12,26 @@
 
 #Import packages
 source('00.DCI_packages.R')
+source('00.DCI_functions.R')
 
 ## Import network and dams dataset (alternative)
-rootdir <- find_root(has_dir("Shapes"))
-datadir <- file.path(rootdir, "Shapes")
+datadir <- file.path(rootdir, "data")
 SouthAmerDir <- file.path(datadir, "South America")
 WatershedsDir <- file.path(datadir, "Watersheds ANA")
 BasinsDir <- file.path(datadir, "Python R Outputs")
 
+## Merge DCI colors in the Basin Shapefile
+BasinsShape <- readOGR(dsn = dcigdb, layer = "BasinATLAS_lev08_v10_br")
 
-mapDCI <- function(DCIname) {
+
+mapDCI <- function(DCIname, in_bas) {
   # Read table for the future projections per basin (absolut values and percentage change)
-  resuDCI <- as.data.frame(read.csv(paste0("DCI_Brazil_L8_", DCIname, ".csv", header = T)))
-  PercChangeData <- as.data.frame(read.csv(paste0("DCI_Brazil_L8_Percentage", DCIname, ".csv")))
+  resuDCI <- as.data.frame(
+    read.csv(file.path(resdir,
+                       paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
+  PercChangeData <- as.data.frame(
+    read.csv(file.path(resdir, 
+                       paste0("DCI_Brazil_L8_Percentage", DCIname, ".csv"))))
   
   ## Assign breaks to values of DCI (100 - DCI)
   CurSHPCut <- cut(100 - resuDCI$SHP_curr, breaks = c(-1, 0, 25, 50, 100), labels = c("d", "c", "b", "a"))
@@ -38,11 +45,20 @@ mapDCI <- function(DCIname) {
   
   
   ## Create a factor with color names
-  CurrColors <- factor(paste(CurSHPCut, CurLHPCut, sep = ""), 
-                       labels = c("#756BB1", "#A96B8C", "#DD6B66",
-                                  "#9198C8", "#BCBDDC", "#DBA8A6", "#FC9272",
-                                  "#6FA3CE", "#ADC4DE", "#EFEDF5", "#FEE0D2",
-                                  "#3182BD", "#9ECAE1", "#DEEBF7", "white"))
+  if (DCIname == 'DCIp') {
+    CurrColors <- factor(paste(CurSHPCut, CurLHPCut, sep = ""), 
+                         labels = c("#756BB1", "#A96B8C", "#DD6B66",
+                                    "#9198C8", "#BCBDDC", "#DBA8A6", "#FC9272",
+                                    "#6FA3CE", "#ADC4DE", "#EFEDF5", "#FEE0D2",
+                                    "#3182BD", "#9ECAE1", "#DEEBF7", "white"))
+  } else if (DCIname == 'DCIi') {
+    CurrColors <- factor(paste(CurSHPCut, CurLHPCut, sep = ""), 
+                         labels = c("#756BB1", "#A96B8C", "#DD6B66", "#DE2D26",
+                                    "#9198C8", "#BCBDDC", "#DBA8A6", "#FC9272",
+                                    "#6FA3CE", "#ADC4DE", "#EFEDF5", "#FEE0D2",
+                                    "#3182BD", "#9ECAE1", "#DEEBF7", "white"))
+  }
+
   
   FutuColors <- factor(paste(FutSHPCut, FutLHPCut, sep = ""), 
                        labels = c("#756BB1", "#A96B8C", "#DD6B66", "#DE2D26",
@@ -56,9 +72,13 @@ mapDCI <- function(DCIname) {
                                   "#6FA3CE", "#ADC4DE", "#EFEDF5", "#FEE0D2",
                                   "#3182BD", "#9ECAE1", "#DEEBF7", "white"))
   
+  Colvec <- c("#DE2D26", "#DD6B66", "#A96B8C", "#756BB1",
+              "#FC9272", "#DBA8A6", "#BCBDDC", "#9198C8",
+              "#FEE0D2", "#EFEDF5", "#ADC4DE", "#6FA3CE",
+              "white", "#DEEBF7", "#9ECAE1", "#3182BD")
   
   ## Create a dataframe with the colors for all the scenarios for each basin
-  DCIColors <- data.frame(resuDCI$HYBAS_ID, CurrColors, FutuColors, PercColors)
+  DCIColors <- data.frame(resuDCI$DAMBAS_ID, CurrColors, FutuColors, PercColors)
   colnames(DCIColors) <- c("HYBAS_ID", "CurrColors", "FutuColors", "PercColors")
   
   
@@ -66,17 +86,15 @@ mapDCI <- function(DCIname) {
   ## Use the function "View" to view the columns of the shapefiles
   SouthAmerShape <- readOGR(dsn = SouthAmerDir, layer = "South_America")
   WatershedsShape <- readOGR(dsn = WatershedsDir, layer = "Regiões_Hidrográficas")
-  BasinsShape <- readOGR(dsn = BasinsDir, layer = "BasinAtlas_level08_Brazil_Clipped")
+  #BasinsShape <- readOGR(dsn = dcigdb, layer = "BasinATLAS_lev08_v10_br")
   
   ## Filter basins that have or will have at least on dam
-  BasinDams <- BasinsShape[which(BasinsShape$HYBAS_ID %in% resuDCI$HYBAS_ID),]
-  
-  ## Merge DCI colors in the Basin Shapefile
-  DCImapBasins <- merge(BasinDams, DCIColors, by = "HYBAS_ID", duplicateGeoms = TRUE)
-  
+  BasinDams <- in_bas[which(in_bas$HYBAS_ID %in% resuDCI$DAMBAS_ID),]
+  DCImapBasins <- merge(BasinDams, DCIColors, by="HYBAS_ID", duplicateGeoms=TRUE)
   
   ## Plot figure - use zm() to zoom in the map
-  tiff(filename = "Figure3.tiff", height = 1926, width = 4400, res = 300, compression = c("lzw"))
+  tiff(filename = file.path(figdir, paste0("Figure3", DCIname, ".tiff")),
+       height = 1926, width = 4400, res = 300, compression = c("lzw"))
   
   par (mfrow = c(1,3), oma = c(0, 2, 0, 2), mar = c(0, 0, 0, 0), bty = "n")
   
@@ -89,7 +107,6 @@ mapDCI <- function(DCIname) {
   plot(WatershedsShape, col = "#FFFFFF00", border= T, lwd = 1.5, add = T)
   
   ## Plot South America map
-  require(jpeg)
   img <- readJPEG("SA.jpeg")
   rasterImage(img,xleft = -73, xright = -60, ybottom = -34, ytop = -19)
   mtext("South America", side = 1, cex = 1.4, line = -7.0, at = -66.6)
@@ -129,11 +146,13 @@ mapDCI <- function(DCIname) {
   mtext("25", side = 1, cex = 1.4, line = -6.5, at = -68.5)
   mtext("50", side = 1, cex = 1.4, line = -6.5, at = -64.8)
   mtext("100", side = 1, cex = 1.4, line = -6.5, at = -60.5)
+  mtext("From LHPs", side = 1, cex = 1.4, line = -4.5, at = -68.5)
   
   mtext("1", side = 2, cex = 1.4, line = 0.2, at = -30.4)
   mtext("25", side = 2, cex = 1.4, line = 0.2, at = -26.85)
   mtext("50", side = 2, cex = 1.4, line = 0.2, at = -22.9)
   mtext("100", side = 2, cex = 1.4, line = 0.2, at = -19.0)
+  mtext("From SHPs", side = 2, cex = 1.4, line = 2.2, at = -26.85)
   
   
   dev.off()
@@ -185,13 +204,6 @@ mapDCI <- function(DCIname) {
   colpallete2 <- brewer.pal(n = 3, name = "Blues")
   colpallete3 <- brewer.pal(n = 3, name = "Purples")
   
-  
-  Colvec <- c("#DE2D26", "#DD6B66", "#A96B8C", "#756BB1",
-              "#FC9272", "#DBA8A6", "#BCBDDC", "#9198C8",
-              "#FEE0D2", "#EFEDF5", "#ADC4DE", "#6FA3CE",
-              "white", "#DEEBF7", "#9ECAE1", "#3182BD")
-  
-  
   ## Plot the legend
   par(mfrow = c(4,4), oma = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), bty = "o")
   
@@ -209,7 +221,8 @@ mapDCI <- function(DCIname) {
   ##############################################################################################################
   
   ## Upload the data
-  PercChangeData <- as.data.frame(read.csv(paste0("DCI_Brazil_L8_Percentage", DCIname, ".csv")))
+  PercChangeData <- as.data.frame(read.csv(
+    file.path(resdir, paste0("DCI_Brazil_L8_Percentage", DCIname, ".csv"))))
   JuruenaBasinsOverall <- read.csv("JuruenaOverall.txt")
   JuruenaBasinsDams <- read.csv("JuruenaWithDams.txt")
   TapajosBasinsOverall <- read.csv("TapajosOverall.txt")
@@ -223,22 +236,22 @@ mapDCI <- function(DCIname) {
   JuruenaPercDam <- PercChangeData[PercChangeData$HYBAS_ID %in% JuruenaBasinsDams$HYBAS_ID, ]
   TapajosPercDam <- PercChangeData[PercChangeData$HYBAS_ID %in% TapajosBasinsDams$HYBAS_ID, ]
   
-  ## Order
-  JuruenaPercDam[order(JuruenaPercDam$PercLoss_SHP), ] 
-  TapajosPercDam[order(TapajosPercDam$PercLoss_SHP), ] 
+  message("Order")
+  message(JuruenaPercDam[order(JuruenaPercDam$PercLoss_SHP), ]) 
+  message(TapajosPercDam[order(TapajosPercDam$PercLoss_SHP), ]) 
   
-  ## Number of basins that will decrease connectivity in more than 50%
-  sum(JuruenaPercDam$PercLoss_SHP < -50)
-  sum(TapajosPercDam$PercLoss_SHP < -50)
+  message("Number of basins that will decrease connectivity in more than 50%")
+  message(sum(JuruenaPercDam$PercLoss_SHP < -50))
+  message(sum(TapajosPercDam$PercLoss_SHP < -50))
   
-  ## Get mean and range
-  mean(JuruenaPercDam$PercLoss_All)
-  mean(JuruenaPercDam$PercLoss_SHP)
-  mean(JuruenaPercDam$PercLoss_LHP)
+  message("Get mean and range")
+  message( mean(JuruenaPercDam$PercLoss_All))
+  message(mean(JuruenaPercDam$PercLoss_SHP))
+  message(mean(JuruenaPercDam$PercLoss_LHP))
   
-  ## Overall average for Juruena
-  sum(JuruenaPercDam$PercLoss_SHP)/(length(JuruenaPercDam$PercLoss_SHP) + JuruenaFree)
+  message("Overall average for Juruena")
+  message( sum(JuruenaPercDam$PercLoss_SHP)/(length(JuruenaPercDam$PercLoss_SHP) + JuruenaFree))
 }
 
-mapDCI(DCIname = 'DCIp')
-mapDCI(DCIname = 'DCIi')
+mapDCI(DCIname = 'DCIp', in_bas = BasinsShape)
+mapDCI(DCIname = 'DCIi', in_bas = BasinsShape)

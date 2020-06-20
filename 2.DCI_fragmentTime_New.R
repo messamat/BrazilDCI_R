@@ -19,7 +19,7 @@ NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
 
   ## Create a vector with unique basin IDs
-  basinList <- as.character(unique(DamAttributes$HYBAS_ID08ext))
+  basinList <- as.character(unique(DamAttributes$DAMBAS_ID08ext))
   
   # Organize dates and place back as years in the dataframe 
   DamYr <- as.Date(DamAttributes$INIC_OPER, format = "%m/%d/%Y")
@@ -55,103 +55,109 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
     SituationScen <- get(ScenarioSituation[x])
     TypeScen <- get(ScenarioType[x])
     
+    Timefilename <- file.path(resdir, 
+                              paste0("DCI_TIME_L8_", DCIname, "_", 
+                                     ScenarioType[x], ".csv"))
     
-    ## Loop over years
-    for(y in 1:length(YearVec)){
-      
-      ## Create a matrix to be filled with the DCIs of a given year
-      DCI_yearY_L8 <- rep(NA, times = length(basinList))
-      
-      ## Loop over basins
-      for (j in 1: length(basinList)){
+    if (!file.exists(Timefilename)) {
+      ## Loop over years
+      for(y in 1:length(YearVec)){
         
-        ## filter attributes of the basin j         
-        BasinX <- NetworkBRAZIL[NetworkBRAZIL$HYBAS_ID08ext == basinList[j], ]
-        DamX <- DamAttributes[DamAttributes$HYBAS_ID08ext == basinList[j], ]
+        ## Create a matrix to be filled with the DCIs of a given year
+        DCI_yearY_L8 <- rep(NA, times = length(basinList))
         
-        # Create a sequence ranging from 1 to the maximum number of segments
-        #Lsegments <- min(unique(BasinX$batNetID))
-        Numbsegments <- length(BasinX$SEGID)
-        
-        ## If there is no dam in the network in that scenario, DCI = 100
-        if (Numbsegments == 1){
-          DCI <- 100
-        }
-        
-        ## For basins with dams in that scenario, DCI is calculated below
-        if (Numbsegments > 1){
+        ## Loop over basins
+        for (j in 1: length(basinList)){
           
-          # Paste the name seg before each segment number and make a vector
-          # Create a vector of fragment lenghts
-          listSeg <- rep (NA, times = Numbsegments)
-          listLengths <- rep (NA, times = Numbsegments)
+          ## filter attributes of the basin j         
+          BasinX <- NetworkBRAZIL[NetworkBRAZIL$HYBAS_ID08ext == basinList[j], ]
+          DamX <- DamAttributes[DamAttributes$DAMBAS_ID08ext == basinList[j], ]
           
-          ## Loop over segments
-          # Fill these two vectors
-          for (i in 1: Numbsegments){
-            listSeg[i] <- paste("seg", BasinX$SEGID[i], sep ="")
-            listLengths[i] <- BasinX$Shape_Length [i]
-          }  
+          # Create a sequence ranging from 1 to the maximum number of segments
+          #Lsegments <- min(unique(BasinX$batNetID))
+          Numbsegments <- length(BasinX$SEGID)
           
-          ## Compile the data on the edges (dam attributes)
-          DowSeg <- paste("seg", DamX$DownSeg, sep ="")
-          UpSeg <- paste("seg", DamX$UpSeg, sep ="")
-          Type <- DamX$Tipo_1
-          Situation <- DamX$ESTAGIO_1
-          ID_number <- DamX$TARGET_FID
-          ID_name <- DamX$NOME
-          Basin <- DamX$HYBAS_ID08
-          Year <- DamX$INIC_OPER
+          ## If there is no dam in the network in that scenario, DCI = 100
+          if (Numbsegments == 1){
+            DCI <- 100
+          }
           
-          ## Put these data in a data frame with all necessary information about the edges
-          EdgesData <- data.frame(DowSeg, UpSeg, Type, Situation, 
-                                  ID_number, ID_name, Basin, Year)
-          
-          ## Create a passibility vector based on the number of segments of the basin
-          ## Assign 100% permeability for all dams with a vector
-          passVec <- rep(1, times = dim(EdgesData)[1])
-          
-          ## Find the position of dams that should be present according to the scenarios (Type and Sitiation = T)
-          PresentDams <- which(EdgesData$Type %in% 
+          ## For basins with dams in that scenario, DCI is calculated below
+          if (Numbsegments > 1){
+            
+            # Paste the name seg before each segment number and make a vector
+            # Create a vector of fragment lenghts
+            listSeg <- rep (NA, times = Numbsegments)
+            listLengths <- rep (NA, times = Numbsegments)
+            
+            ## Loop over segments
+            # Fill these two vectors
+            for (i in 1: Numbsegments){
+              listSeg[i] <- paste("seg", BasinX$SEGID[i], sep ="")
+              listLengths[i] <- BasinX$Shape_Length [i]
+            }  
+            
+            ## Compile the data on the edges (dam attributes)
+            DowSeg <- paste("seg", DamX$DownSeg, sep ="")
+            UpSeg <- paste("seg", DamX$UpSeg, sep ="")
+            Type <- DamX$Tipo_1
+            Situation <- DamX$ESTAGIO_1
+            ID_number <- DamX$TARGET_FID
+            ID_name <- DamX$NOME
+            Basin <- DamX$DAMBAS_ID08
+            Year <- DamX$INIC_OPER
+            
+            ## Put these data in a data frame with all necessary information about the edges
+            EdgesData <- data.frame(DowSeg, UpSeg, Type, Situation, 
+                                    ID_number, ID_name, Basin, Year)
+            
+            ## Create a passibility vector based on the number of segments of the basin
+            ## Assign 100% permeability for all dams with a vector
+            passVec <- rep(1, times = dim(EdgesData)[1])
+            
+            ## Find the position of dams that should be present according to the scenarios (Type and Sitiation = T)
+            PresentDams <- which(EdgesData$Type %in% 
                                  TypeScen * EdgesData$Situation %in% 
                                  SituationScen == 1)
+            
+            ## Assign a permeability value of 0.1 for the dams of the scenario based on their position
+            passVec[PresentDams] <- 0.1
+            
+            ## Replace the permeability of dams not constructed yet according to year y for 100%
+            passVec[which(EdgesData$Year >= YearVec[y])] <- 1
+            
+            # List of edges and passability
+            d2 = data.frame (id1 = EdgesData[, 1], id2 = EdgesData[, 2],
+                             pass = passVec) %>%
+              setDT
+            
+            # attributes of nodes; node sizes
+            d3 = data.frame(id = listSeg, l = listLengths) %>%
+              setDT
+            
+            # Run DCI analyses for the basin
+            DCI <- DCIfunc (d2, d3, print = F)
+            #DCIi <- DCIi(d2, d3, print = F) #Downseg as the reference
+            
+          }
           
-          ## Assign a permeability value of 0.1 for the dams of the scenario based on their position
-          passVec[PresentDams] <- 0.1
+          # Fill out the yearly vector of DCIs for all basins
+          DCI_yearY_L8[j] <- DCI
           
-          ## Replace the permeability of dams not constructed yet according to year y for 100%
-          passVec[which(EdgesData$Year >= YearVec[y])] <- 1
+          ## Compute the DCI of the Basin and year in the matrix
+          DCI_TIME_L8[, y] <- DCI_yearY_L8
           
-          # List of edges and passability
-          d2 = data.frame (id1 = EdgesData[, 1], id2 = EdgesData[, 2],
-                           pass = passVec)
-          
-          # attributes of nodes; node sizes
-          d3 = data.frame(id = listSeg, l = listLengths)
-          
-          # Run DCI analyses for the basin
-          DCI <- DCIfunc (d2, d3, print = F)
-          #DCIi <- DCIi(d2, d3, print = F) #Downseg as the reference
+          ## Print indexes to follow the calculations
+          print(c(x, y, j))
           
         }
         
-        # Fill out the yearly vector of DCIs for all basins
-        DCI_yearY_L8[j] <- DCI
-        
-        ## Compute the DCI of the Basin and year in the matrix
-        DCI_TIME_L8[, y] <- DCI_yearY_L8
-        
-        ## Print indexes to follow the calculations
-        print(c(x, y, j))
-        
+        ## Create a csv file with the output of DCI analysis for all the scenarios
+        write.csv(DCI_TIME_L8, file = Timefilename)
       }
-      
-      ## Create a csv file with the output of DCI analysis for all the scenarios
-      Timefilename <- paste0("DCI_TIME_L8_", DCIname, "_", 
-                             ScenarioType[x], ".csv")
-      write.csv(DCI_TIME_L8, file = Timefilename)
+    } else {
+      print(paste0(Timefilename, ' already exists...'))
     }
-    
   }
   
   toc()
@@ -173,7 +179,7 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   # Read table for the future projections per basin
   resuDCI <- as.data.frame(read.csv(
     file.path(resdir,
-              paste0("DCI_Brazil_L8_", DCIname, ".csv", header = T))))
+              paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
   
   ## Create a vector of years
   YearVec <- seq(from = 1899, to = 2018)
@@ -281,11 +287,46 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   mtext("All", side = 1, cex = 2.0, line = -18.5, at = 2048)
   
   dev.off()
-  
-  
+}
+
+
+# damfragment_time(DamAttributes = DamAttributes,
+#                  NetworkBRAZIL = NetworkBRAZIL,
+#                  DCIfunc = DCIp_opti5,
+#                  DCIname = 'DCIp')
+# 
+# 
+# damfragment_time(DamAttributes = DamAttributes,
+#                  NetworkBRAZIL = NetworkBRAZIL,
+#                  DCIfunc = DCIi_opti,
+#                  DCIname = 'DCIi')
+
+
+
   ###############################################################################################
   ################## Compute some statistics of fragmentation over time #########################
   ###############################################################################################
+  DCIname <- 'DCIp'
+  
+  ## read table with the outputs
+  TimeTable_All <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_All.csv"))))
+  TimeTable_SHP <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_Small.csv"))))
+  TimeTable_LHP <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_Large.csv"))))
+  
+  # Read table for the future projections per basin
+  resuDCI <- as.data.frame(read.csv(
+    file.path(resdir,
+              paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
+  
+  ## Create a vector of years
+  YearVec <- seq(from = 1899, to = 2018)
+  
   ## Calculate the average decrease in absolute values of DCI
   # All current
   initialStage <- rep(100, times = length(resuDCI$All_curr))
@@ -398,16 +439,137 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   round(mean(YearRatesMatSHP[61:100,2]), digits = 2) ## 1960 -1999
   round(mean(YearRatesMatSHP[101:119,2]), digits = 2) ##2000 - 2018
   
-}
+  
+  DCIname <- 'DCIi'
+  
+  ## read table with the outputs
+  TimeTable_All <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_All.csv"))))
+  TimeTable_SHP <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_Small.csv"))))
+  TimeTable_LHP <- as.data.frame(read.csv(
+    file.path(resdir, 
+              paste0("DCI_TIME_L8_", DCIname, "_Large.csv"))))
+  
+  # Read table for the future projections per basin
+  resuDCI <- as.data.frame(read.csv(
+    file.path(resdir,
+              paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
+  
+  ## Create a vector of years
+  YearVec <- seq(from = 1899, to = 2018)
+  
+  ## Calculate the average decrease in absolute values of DCI
+  # All current
+  initialStage <- rep(100, times = length(resuDCI$All_curr))
+  mean(initialStage - resuDCI$All_curr)
+  
+  # All future
+  initialStage <- rep(100, times = length(resuDCI$All_fut))
+  mean(initialStage - resuDCI$All_fut)
+  
+  # SHP current
+  initialStage <- rep(100, times = length(resuDCI$SHP_curr))
+  mean(initialStage - resuDCI$SHP_curr)
+  
+  # SHP future
+  initialStage <- rep(100, times = length(resuDCI$SHP_fut))
+  mean(initialStage - resuDCI$SHP_fut)
+  
+  # LHP current
+  initialStage <- rep(100, times = length(resuDCI$LHP_curr))
+  mean(initialStage - resuDCI$LHP_curr)
+  
+  # LHP future
+  initialStage <- rep(100, times = length(resuDCI$LHP_fut))
+  mean(initialStage - resuDCI$LHP_fut)
+  
+  
+  ## Calculate the standard deviation for decrease in DCI
+  # All current
+  initialStage <- rep(100, times = length(resuDCI$All_curr))
+  sd(initialStage - resuDCI$All_curr)
+  
+  # All future
+  initialStage <- rep(100, times = length(resuDCI$All_fut))
+  sd(initialStage - resuDCI$All_fut)
+  
+  # SHP current
+  initialStage <- rep(100, times = length(resuDCI$SHP_curr))
+  sd(initialStage - resuDCI$SHP_curr)
+  
+  # SHP future
+  initialStage <- rep(100, times = length(resuDCI$SHP_fut))
+  sd(initialStage - resuDCI$SHP_fut)
+  
+  # LHP current
+  initialStage <- rep(100, times = length(resuDCI$LHP_curr))
+  sd(initialStage - resuDCI$LHP_curr)
+  
+  # LHP future
+  initialStage <- rep(100, times = length(resuDCI$LHP_fut))
+  sd(initialStage - resuDCI$LHP_fut)
+  
+  
+  ## Calculate the range of the decrease
+  # All current
+  100 - max(resuDCI$All_curr)
+  100 - min(resuDCI$All_curr)
+  
+  # All future
+  100 - max(resuDCI$All_fut)
+  100 - min(resuDCI$All_fut)
+  
+  # SHP
+  100 - max(resuDCI$SHP_curr)
+  100 - min(resuDCI$SHP_curr)
+  
+  # LHP
+  100 - max(resuDCI$LHP_curr)
+  100 - min(resuDCI$LHP_curr)
+  
+  
+  ## Calculate rates of decrease per year (I did the first round in excel)
+  
+  ## All
+  YearMeans_All <- round(colMeans(TimeTable_All), digits = 1)
+  YearRates_All <- rep(NA, times = length(YearMeans_All) - 2)
+  
+  for (i in 3: length(YearMeans_All)){
+    YearRates_All[i-2] <- YearMeans_All[i] - YearMeans_All[i - 1]
+  }
+  
+  YearRatesMat <- cbind(1900:2018, YearRates_All)
+  
+  mean(YearRatesMat[61:70,2]) ##60s
+  mean(YearRatesMat[71:80,2]) ##70s
+  mean(YearRatesMat[81:90,2]) ##80s
+  mean(YearRatesMat[91:100,2]) ##90s
+  mean(YearRatesMat[101:110,2]) ##2000s
+  mean(YearRatesMat[111:119,2]) ##2010s
+  
+  round(mean(YearRatesMat[61:100,2]), digits = 2) ## 1960 -1999
+  round(mean(YearRatesMat[101:119,2]), digits = 2) ##2000 - 2018
+  
+  ## SHPs
+  YearMeans_SHP <- round(colMeans(TimeTable_SHP), digits = 1)
+  YearRates_SHP <- rep(NA, times = length(YearMeans_SHP) - 2)
+  
+  for (i in 3: length(YearMeans_SHP)){
+    YearRates_SHP[i-2] <- YearMeans_SHP[i] - YearMeans_SHP[i - 1]
+  }
+  
+  YearRatesMatSHP <- cbind(1900:2018, YearRates_SHP)
+  
+  mean(YearRatesMatSHP[61:70,2]) ##60s
+  mean(YearRatesMatSHP[71:80,2]) ##70s
+  mean(YearRatesMatSHP[81:90,2]) ##80s
+  mean(YearRatesMatSHP[91:100,2]) ##90s
+  mean(YearRatesMatSHP[101:110,2]) ##2000s
+  mean(YearRatesMatSHP[111:119,2]) ##2010s
+  
+  round(mean(YearRatesMatSHP[61:100,2]), digits = 2) ## 1960 -1999
+  round(mean(YearRatesMatSHP[101:119,2]), digits = 2) ##2000 - 2018
 
-
-damfragment_time(DamAttributes = DamAttributes,
-                 NetworkBRAZIL = NetworkBRAZIL,
-                 DCIfunc = DCIp_opti5,
-                 DCIname = 'DCIp')
-
-
-damfragment_time(DamAttributes = DamAttributes,
-                 NetworkBRAZIL = NetworkBRAZIL,
-                 DCIfunc = DCId_opti,
-                 DCIname = 'DCId')

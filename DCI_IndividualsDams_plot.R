@@ -36,14 +36,21 @@ plotindivdams <- function(DamAttributes, DCIname) {
   TypeColor <- factor(x = TypeFac, levels = levels(TypeFac), 
                       labels = c("#4876FF50", "#8B000050"))
   
+  maxdiffceil <- -20*ceiling(max(RankedDams$DCIMeanDiff)/20)
+  maxcapaceil <- 1000*ceiling(max(RankedDams$Capacity)/1000)
   ## Plot figure #xaxt = "n", log(RankedDams$Capacity)
-  plot(RankedDams$Capacity, -RankedDams$DCIMeanDiff, type = "n", ylim = c(-60, 0), xlim = c(0.1, 8000),
+  plot(RankedDams$Capacity, -RankedDams$DCIMeanDiff, type = "n", 
+       ylim = c(maxdiffceil, 0), 
+       xlim = c(0.1, maxcapaceil),
        ylab = "", xlab = "",  yaxt = "n", xaxt = "n", log = "x") 
   
   options(scipen=5)
-  axis(side = 2, at = c(-60, -40, -20, 0), cex.axis = 2.6, line = 0)
-  axis(side = 1, at = c(1, 10, 30, 100, 500, 4000), cex.axis = 2.6, line = 0, mgp = c(3, 1.8, 0))
-  axis(side = 1, at = c(0.1, 1), labels = c(0.1, " "), cex.axis = 2.6, line = 0, mgp = c(3, 1.8, 0))
+  axis(side = 2, at = seq(maxdiffceil, 0, 20), 
+       cex.axis = 2.6, line = 0)
+  axis(side = 1, at = c(1, 10, 30, 100, 500, maxcapaceil), 
+       cex.axis = 2.6, line = 0, mgp = c(3, 1.8, 0))
+  axis(side = 1, at = c(0.1, 1), labels = c(0.1, " "), 
+       cex.axis = 2.6, line = 0, mgp = c(3, 1.8, 0))
   
   mtext("Change in basin-level", side = 2, cex = 3.2, line = 6.8)
   mtext("river connectivity (DCI)", side = 2, cex = 3.2, line = 4.0)
@@ -65,17 +72,18 @@ plotindivdams <- function(DamAttributes, DCIname) {
          bg = as.vector(TypeColor), cex = 2.5)
   
   ## Plot legend
-  legend(x = 200, y = -47, pch = c(21), legend = c("Planned SHP", "Planned LHP"), cex = 2.5,
+  legend(x = 150, y = 0.8*maxdiffceil, pch = c(21), legend = c("Planned SHP", "Planned LHP"), cex = 2.5,
          pt.cex = 3.3, pt.bg = c("#8B000060","#4876FF60"), xpd = T, bty = "n")
   
   dev.off()
   
-  
   ################################################################################################################
   #####################################  Some Statistics  ########################################################
-  RankedDams$Capacity
-  RankedDams$DCIMeanDiff
   
+  message("RankedDams$Capacity")
+  message(RankedDams$Capacity)
+  message("RankedDams$DCIMeanDiff")
+  message(RankedDams$DCIMeanDiff)
   
   ## Linear models effect on DCI Vs Capacity
   plot(RankedDams$Capacity, RankedDams$DCIMeanDiff)
@@ -85,7 +93,7 @@ plotindivdams <- function(DamAttributes, DCIname) {
   
   ## All
   overallLm <- lm(log(RankedDams$DCIMeanDiff) ~ log(RankedDams$Capacity))
-  summary(overallLm)
+  message(summary(overallLm))
   hist(overallLm$resid, main="Histogram of Residuals",
        ylab="Residuals")
   qqnorm(overallLm$resid)
@@ -93,11 +101,12 @@ plotindivdams <- function(DamAttributes, DCIname) {
   plot(RankedDams$Capacity, RankedDams$DCIMeanDiff, log='xy')
   abline(overallLm)
   
-  cor.test(x=log(RankedDams$Capacity), y=log(RankedDams$DCIMeanDiff), method = 'pearson')
+  message("cor.test(x=log(RankedDams$Capacity), y=log(RankedDams$DCIMeanDiff), method = 'pearson')")
+  message(cor.test(x=log(RankedDams$Capacity), y=log(RankedDams$DCIMeanDiff), method = 'pearson'))
   
   ## Just SHPs
   SHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "SHP"]))
-  summary(SHPLm)
+  message(summary(SHPLm))
   hist(SHPLm$resid, main="Histogram of Residuals",
        ylab="Residuals")
   qqnorm(SHPLm$resid)
@@ -105,11 +114,12 @@ plotindivdams <- function(DamAttributes, DCIname) {
   plot(log(RankedDams$Capacity[RankedDams$Type == "SHP"]), log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]))
   abline(SHPLm)
   
-  cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "SHP"]), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]), method = 'pearson')
+  message("cor.test(x=log(RankedDams$Capacity[RankedDams$Type == 'SHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'SHP']), method = 'pearson')")
+  message(cor.test(x=log(RankedDams$Capacity[RankedDams$Type == 'SHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'SHP']), method = 'pearson'))
   
   ## Just LHPs
   LHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]) ~ log(RankedDams$Capacity[RankedDams$Type == "LHP"]))
-  summary(LHPLm)
+  message(summary(LHPLm))
   hist(LHPLm$resid, main="Histogram of Residuals",
        ylab="Residuals")
   qqnorm(LHPLm$resid)
@@ -117,35 +127,26 @@ plotindivdams <- function(DamAttributes, DCIname) {
   plot(log(RankedDams$Capacity[RankedDams$Type == "LHP"]), log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]))
   abline(LHPLm)
   
-  cor.test(x=log(RankedDams$Capacity[RankedDams$Type == "LHP"]), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]), method = 'pearson')
+  message("cor.test(x=log(RankedDams$Capacity[RankedDams$Type == 'LHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'LHP']), method = 'pearson')")
+  message(cor.test(x=log(RankedDams$Capacity[RankedDams$Type == 'LHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'LHP']), method = 'pearson'))
   
   ## Create a csv of future dams rank basend on mean DCI
-  ## Add columns with lat-long
-  ## Created in ArcGIS two columns with Lat and long of the dams (Decimal degree, WGS 1984)
-  FullDamAttributes <- read.csv(file.path(resdir, "DamAttributesCoordinates.txt", header = T))
-  
-  Lat <- vector()
-  Long <- vector()
-  
-  for (i in 1: dim(OrderDams)[1]){
-    IDName_Position <- which(FullDamAttributes$TARGET_FID == RankedDams$ID[i] & FullDamAttributes$NOME %in% RankedDams$Name[i])
-    DamLatLong <- FullDamAttributes[IDName_Position, 20:21]
-    Lat <- c(Lat, FullDamAttributes$Lat[IDName_Position])
-    Long <- c(Long, FullDamAttributes$Long[IDName_Position])
-    
-  }
+  RankedDams_format <- RankedDams[DamAttributes[, .(DAMID, POINT_X, POINT_Y)],
+                                  on='DAMID']
   
   ## Organize order and headers
-  numcols <- names(RankedDams)[sapply(RankedDams, is.numeric)]
-  OrderDams <- RankedDams[, (numcols) := lapply(.SD, function(x) round(x, digits = 2)), 
-                          .SDcols=numcols] %>%
-    .[, .(DamRank, Type, Name, DAMID, Capacity, DCIMeanDiff, DCIUppLim, DCIDownLim)] %>%
-    merge(DamAttributes[,.(DAMID, NEAR_X, NEAR_Y)], by='DAMID', all.y=F) %>%
+  numcols <- names(RankedDams_format)[sapply(RankedDams_format, is.numeric)]
+  OrderDams <- RankedDams_format[
+    , (numcols) := lapply(.SD, function(x) round(x, digits = 2)), 
+    .SDcols=numcols] %>%
+    .[, .(DamRank, Type, Name, DAMID, Capacity, 
+          DCIMeanDiff, DCIUppLim, DCIDownLim, 
+          POINT_X, POINT_Y)] %>%
     setorder(DCIMeanDiff) %>%
     setnames(c("Rank", "Type", "Name",  "DamID", "Capacity(MW)",
                "Mean effect on basin's DCI", 
                "Upper limit", "Lower limit",
-               "X_Sirgas", "Y_Sirgas"))
+               "Lat_WGS84", "Lon_WGS84"))
   write.csv(OrderDams, 
             file = file.path(resdir,
                              paste0("Supplement_FutureDamRank", DCIname, ".csv")))

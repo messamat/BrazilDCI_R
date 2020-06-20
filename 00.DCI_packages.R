@@ -9,6 +9,7 @@ library(ggplot2)
 library(igraph) # library graph theory
 library(magrittr)
 library(maps)
+library(jpeg)
 library(parallel)
 library(plyr)
 library(RColorBrewer)

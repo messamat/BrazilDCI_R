@@ -7,9 +7,6 @@ source('00.DCI_functions.R')
 NetworkBRAZILCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='networkattributes'))
 DamAttributesCrude <- as.data.table(sf::st_read(dsn = dcigdb, layer='damattributes'))
 
-## Remove the dams that have NAs as their basin ID from the dataset
-DamAttributesCrude <- DamAttributesCrude[!is.na(DamAttributesCrude$HYBAS_ID08),]
-
 #------ DEAL WITH COASTAL DRAINAGES ------
 #Keep only network within basins that contain dams, excluding coastal segments without dams
 #(only keep segments that are either in UpSeg or DownSeg of a dam and within a basin with a dam)
