@@ -253,13 +253,14 @@ getParetostats <- function(DCIname, in_scenarios) {
 #Check whether Pareto frontier approximation is good
 checkPareto <- function(DCIname, in_scenarios) {
   NationalScenarios <- in_scenarios
+  maxNatDCI <- NationalScenarios[, max(NatAverageDCI)]
   
   #Assess whether reaching Pareto frontier
-  nscen_seq <- c(seq(1, nrow(NationalScenarios), 100), nrow(NationalScenarios))
+  nscen_seq <- c(seq(1000, nrow(NationalScenarios), 5000), nrow(NationalScenarios))
   growfrontier_dt <- lapply(nscen_seq,
                             function(nscen) {
                               print(nscen)
-                              subscens <- NationalScenarios[sample(.N, nscen), -'scenIDs', with=F]
+                              subscens <- NationalScenarios[1:nscen, -'scenIDs', with=F]
                               sub_best <- psel(subscens,
                                                pref = high(subscens$AddCapacity) *
                                                  high(subscens$NatAverageDCI)) %>%
@@ -268,21 +269,113 @@ checkPareto <- function(DCIname, in_scenarios) {
                             }
   ) %>%
     rbindlist
-  growfrontier_dt[, AddCapacity_int := round(AddCapacity)]
+  
+  
+  
+  growfrontier_cast <- dcast(growfrontier_dt, AddCapacity~nscen, 
+                             value.var = 'NatAverageDCI') %>%
+    setnafill(type='nocb') %>% 
+    melt(id.vars='AddCapacity', variable.name='nscen', value.name='NatAverageDCI') %>%
+    .[, nscen := as.numeric(as.character(nscen))] %>%
+    setorder(AddCapacity, nscen)
+  
+  growfrontier_cast[, maxDCI := max(NatAverageDCI), by=AddCapacity] %>%
+    .[, DCIpercdiff := (maxDCI-NatAverageDCI)/maxDCI]
+  
+  growfrontier_mean <- growfrontier_cast[
+    , list(DCIpercdiff=mean(DCIpercdiff, na.rm=T)), 
+    by=nscen]
+  
+  ggplot(growfrontier_cast, aes(x=nscen, y=DCIpercdiff)) + 
+    geom_line(aes(group=AddCapacity), alpha=1/10) + 
+    geom_line(data=growfrontier_mean, color='red', size=1.2) + 
+    theme_classic()
+    
+    
+    
+    
+    
+    
+    [, NatAverageDCImax := max(NatAverageDCI), by=AddCapacity]
   
   growfrontierdiff <- growfrontier_dt[
-    , DCIdiff := (max(NatAverageDCI) - NatAverageDCI)/max(NatAverageDCI),
-    by=AddCapacity_int] %>%
-    .[, list(meandcidiff = mean(DCIdiff)), by=nscen]
+    , DCIdiff := (NatAverageDCImax - NatAverageDCI)/NatAverageDCImax,
+    by=.(nscen, AddCapacity)] 
   
-  ggplot(growfrontierdiff, aes(x=nscen, y=meandcidiff)) +
+
+  
+  ggplot(frontiersub, aes(x=AddCapacity, y=NatAverageDCI, 
+                          group=nscen, color=nscen)) + 
+    geom_smooth() +
+    scale_color_distiller(palette='Spectral') + 
+    theme_classic()
+  
+  ggplot(frontiersub, aes(x=AddCapacity, y=NatAverageDCI, 
+                          group=nscen, color=nscen)) + 
+    geom_point() +
+    scale_color_distiller(palette='Spectral') + 
+    theme_classic()
+  
+  frontiercast <- 
+  
+  ggplot(frontiercast)
+  
+
+  
+
+  
+  
+  
+  
+
+  
+  
+  paretoloess <- lapply(nscen_seq, function(in_nscen) {
+    print(in_nscen)
+    subdt <- growfrontier_dt[nscen==in_nscen,]
+    mod <- loess(formula=NatAverageDCI~AddCapacity, 
+                 data= subdt,
+                 span = 0.75, degree = 2,
+                 method = "loess")
+    
+    predx <- seq(100, NationalScenarios[, max(AddCapacity)], 100)
+    pred_dt <- data.table(AddCapacity = predx, 
+                          NatAverageDCI = predict(mod, predx),
+                          nscen = in_nscen)
+    return(pred_dt)
+  }) %>%
+    rbindlist()
+  
+  ggplot(paretoloess[nscen %in% c(1000, 6000, 11000),],
+         aes(x=AddCapacity, y=NatAverageDCI, group = nscen, color=nscen)) + 
+    geom_point(alpha=0.7) +
+    scale_color_distiller(palette='Spectral') + 
+    theme_classic()
+  
+  paretoloess_cast <- dcast(paretoloess, AddCapacity~nscen, value.var='NatAverageDCI')
+  
+  loessdiff <- mapply(function(nscen1, nscen2) {
+    print(nscen1)
+    print(nscen2)
+    diff <- paretoloess_cast[
+      ,get(as.character(nscen2))-get(as.character(nscen1))]
+    return(diff)
+  }, nscen_seq[1:(length(nscen_seq)-1)], nscen_seq[2:length(nscen_seq)]) %>%
+    as.data.table %>%
+    setnames(as.character(nscen_seq[2:length(nscen_seq)])) %>%
+    cbind(AddCapacity=paretoloess_cast[,AddCapacity]) %>%
+    melt(id.vars='AddCapacity', variable.name='nscen2', value.name='DCIdiff')
+  
+
+  ggplot(loessdiff, aes(x=nscen2, DCIdiff, group=AddCapacity)) + 
     geom_point()
-  
 }
+
+
 
 for (i in c('DCIp', 'DCIi')) {
   scenarios <- getParetodat(i)
-  #plottabPareto(i, scenarios)
+  plottabPareto(i, scenarios)
   getParetostats(i, scenarios)
   #checkPareto(i, scenarios)
 }
