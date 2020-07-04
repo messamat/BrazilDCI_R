@@ -130,6 +130,7 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
                                           list(DAMBAS_ID08ext=j,
                                                ndams=.N,
                                                POT_KWbasin = sum(POT_KW/1000),
+                                               Guarantee := sum(fifelse(Tipo_1 == 'LHP', 0.55, 0.6)*POT_KW/1000),
                                                SHPnum = sum(Tipo_1=='SHP'),
                                                LHPnum = sum(Tipo_1=='LHP'),
                                                DamIDs = toString(DAMID),
@@ -159,17 +160,18 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
                                 quantile(DCIdiff, 0.025),
                                 length(DCIdiff)*2))
                             }) %>% #Add dam attributes
-                              cbind(DamX[ESTAGIO_1 == "Planned", .(Tipo_1, 
+                              cbind(DamX[ESTAGIO_1 == "Planned", .(NOME, 
+                                                                   DAMBAS_ID08ext,
+                                                                   Tipo_1, 
                                                                    ESTAGIO_1, 
-                                                                   POT_KW/1000, 
-                                                                   NOME, 
-                                                                   DAMBAS_ID08ext)])
+                                                                   POT_KW/1000)]) %>%
+                              .[, Guarantee := fifelse(Tipo_1 == 'LHP', 0.55, 0.6)*POT_KW/1000]
                             
                             colnames(DCIdiffstats) <- c("DAMID", "DCIMeanDiff", "DCIUppLim", "DCIDownLim", "DCIUpCI", "DCIDownCI", "Nscenarios",
-                                                        "Type", "Situation", "Capacity","Name", "Basin")
+                                                        "Name", "Basin", "Type", "Situation", "Capacity", "Guarantee")
                             
                             return(DCIdiffstats)
-                          }
+            }
   stopCluster(cl)
   toc()
   big_data <- as.data.table(do.call("rbind", DCIscens))

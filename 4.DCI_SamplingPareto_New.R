@@ -9,7 +9,7 @@
 ###########            (National-level multi-objective optimization)       #####################################
 ###############################################################################################################
 ## Choose the total number of scenarios to sample (includes already sampled scenarios)
-numbScen <- 1050000
+numbScen <- 1000000
 
 #Import packages
 source('00.DCI_packages.R')
@@ -21,7 +21,8 @@ DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
 NetworkBRAZIL <- read.fst(file.path(resdir, 'NetworkBRAZIL.fst')) %>% setDT
 
 
-sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
+sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
+                          checkprevious=F) {
   #Run DCI for current scenario
   #Compute DCI for Allcurrent scenario
   DCI_L8_current <- NetworkBRAZIL[,
@@ -58,6 +59,7 @@ sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   DCI_L8_current[, `:=`(scenbasin = 0,
                         ndams=0,
                         POT_KWbasin = 0,
+                        Guarantee = 0,
                         SHPnum = 0,
                         LHPnum = 0,
                         DamIDs = NA,
@@ -66,18 +68,22 @@ sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   
   
   #---------------- Check whether scenarios already exist and adjust number to sample ------
-  #Check whether 
-  nationalfiles <- list.files(path=resdir, 
-                              pattern= paste0("NationalScen_", 
-                                              DCIname, "_.*[.]fst"))
-  if (length(nationalfiles) > 0) {
-    NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
-      setDT %>%
-      unique #Only keep unique scenarios (mostly removes the multiple scenarios with all dams or no dams)
-    numbScen = numbScen - NationalScenarios[substr(scenIDs, 1,2) != 'NA', .N]
-    remove(NationalScenarios)
-    gc()
+  if (checkprevious) {
+    nationalfiles <- list.files(path=resdir,
+                                pattern= paste0("NationalScen_",
+                                                DCIname, "_.*[.]fst"))
+    if (length(nationalfiles) > 0) {
+      for (nfile in nationalfiles) {
+        NationalScenarios <- read.fst(file.path(resdir, nfile)) %>%
+          setDT %>%
+          unique #Only keep unique scenarios (mostly removes the multiple scenarios with all dams or no dams)
+        numbScen = numbScen - NationalScenarios[substr(scenIDs, 1,2) != 'NA', .N]
+        remove(NationalScenarios)
+        gc()
+      }
+    }
   }
+
   
   #----------------- Launch sampling -------------------------------------------------------
   #Sample number of scenarios
@@ -116,6 +122,7 @@ sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
                               setorder(DAMBAS_ID08ext) %>%
                               .[, list(NatAverageDCI = mean(DCI, na.rm=T), #Get statistics
                                        AddCapacity = sum(POT_KWbasin, na.rm=T),
+                                       AddGuarantee = sum(Guarantee, na.rm=T),
                                        NFutDams = sum(ndams, na.rm=T), 
                                        NFutSHP = sum(SHPnum, na.rm=T),
                                        NFutLHP = sum(LHPnum, na.rm=T),
@@ -132,13 +139,20 @@ sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   toc()
   
   write.fst(DCIscens, file.path(resdir, paste0("NationalScen_", 
-                                               DCIname, "_", Sys.Date(), ".fst")))
+                                               DCIname, "_", 
+                                               format(Sys.time(), "%Y%m%d_%Hh"),
+                                               ".fst")))
 }
 
-sample_pareto(DamAttributes = DamAttributes,
-              NetworkBRAZIL = NetworkBRAZIL,
-              DCIfunc = DCIp_opti5,
-              DCIname = 'DCIp')
+for (i in 1:5) {
+  sample_pareto(DamAttributes = DamAttributes,
+                NetworkBRAZIL = NetworkBRAZIL,
+                DCIfunc = DCIp_opti5,
+                DCIname = 'DCIp',
+                checkprevious=F)
+  gc()
+}
+
 
 sample_pareto(DamAttributes = DamAttributes,
               NetworkBRAZIL = NetworkBRAZIL,

@@ -16,24 +16,55 @@ getParetodat <- function(DCIname) {
   #Import scenarios
   nationalfiles <- list.files(path=resdir,
                               pattern=paste0("NationalScen_", DCIname, "_.*[.]fst"))
-  NationalScenarios <- read.fst(file.path(resdir, nationalfiles[length(nationalfiles)])) %>%
+  NationalScenarios <- read.fst(file.path(resdir, nationalfiles[1])) %>%
     setDT %>%
-    unique 
+    unique(by='scenIDs') 
+  
+  NationalScenarios2 <- read.fst(file.path(resdir, nationalfiles[2])) %>%
+    setDT %>%
+    unique(by='scenIDs') 
+  
+  NationalScenarios3 <- read.fst(file.path(resdir, nationalfiles[3])) %>%
+    setDT %>%
+    unique(by='scenIDs') 
+  
+  NationalScenarios <- rbind(NationalScenarios, 
+                             NationalScenarios2,
+                             NationalScenarios3) %>%
+    unique(by='scenIDs')
+  
+  remove(NationalScenarios2)
+  remove(NationalScenarios3)
+  
+  NationalScenarios4 <- read.fst(file.path(resdir, nationalfiles[4])) %>%
+    setDT %>%
+    unique(by='scenIDs') 
+  
+  NationalScenarios5 <- read.fst(file.path(resdir, nationalfiles[5])) %>%
+    setDT %>%
+    unique(by='scenIDs') 
+  
+  NationalScenarios <- rbind(NationalScenarios, 
+                             NationalScenarios4,
+                             NationalScenarios5) %>%
+    unique(by='scenIDs')
+  
   return(NationalScenarios)
 }
 
 #Make plot of outputs + write optimal scenarios to table
-plottabPareto <- function(DCIname, in_scenarios) {
+plottabPareto <- function(DCIname, prodmeasure, in_scenarios) {
   NationalScenarios <- in_scenarios
+  prodmeasure <- paste0('Add', prodmeasure)
   
   Best <- psel(NationalScenarios, 
-               pref = high(NationalScenarios$AddCapacity) * high(NationalScenarios$NatAverageDCI))
+               pref = high(NationalScenarios[, prodmeasure]) * high(NationalScenarios$NatAverageDCI))
   print('Number and stats on optimal scenarios:')
   nrow(Best)
   summary(Best)
   
   Worst <- psel(NationalScenarios, 
-                pref = low(NationalScenarios$AddCapacity) * low(NationalScenarios$NatAverageDCI))
+                pref = low(NationalScenarios[, prodmeasure]) * low(NationalScenarios$NatAverageDCI))
   print('Number and stats on least-optimal scenarios:')
   nrow(Worst)
   summary(Worst)
@@ -44,11 +75,12 @@ plottabPareto <- function(DCIname, in_scenarios) {
   DemandLow <- 120 - CurrentGen_GW
   DemandHigh <- 141 - CurrentGen_GW
   
-  BestDemand <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <= DemandHigh, 1:7]
-  WorstDemand <- Worst[Worst$AddCapacity/1000 >= DemandLow & Worst$AddCapacity/1000 <= DemandHigh, 1:7]
+  BestDemand <- Best[Best[, prodmeasure]/1000 >= DemandLow & Best[, prodmeasure]/1000 <= DemandHigh, 1:7]
+  WorstDemand <- Worst[Worst[, prodmeasure]/1000 >= DemandLow & Worst[, prodmeasure]/1000 <= DemandHigh, 1:7]
   
   # Plot 6 (DCI loss Vs Capacity)
-  tiff(filename = file.path(figdir, paste0("Figure6_", DCIname, Sys.Date(), ".tiff")),
+  tiff(filename = file.path(figdir, paste0("Figure6_", DCIname, "_", 
+                                           prodmeasure, Sys.Date(), ".tiff")),
        height = 2396, width = 3800, res = 300, compression = c("lzw"))
   par(oma = c(8, 8.5, 7, 2), mar = c(0.5, 0, 0, 0), bty = "n")
   
@@ -67,7 +99,7 @@ plottabPareto <- function(DCIname, in_scenarios) {
   mincapfloor <- 5*floor(min(NationalScenarios$NatAverageDCI)/5)
   maxcapceil <- 5*ceiling(max(NationalScenarios$NatAverageDCI)/5)
   
-  plot(NationalScenarios$AddCapacity, 
+  plot(NationalScenarios[, prodmeasure], 
        NationalScenarios$NatAverageDCI, 
        type = "n", 
        ylim = c(mincapfloor, maxcapceil), xlim = c(0, 65), 
@@ -81,8 +113,10 @@ plottabPareto <- function(DCIname, in_scenarios) {
   axis(side = 1, at = c(0, 10, 20, 30, 40, 50, 60),
        cex.axis = 3.2, line = 0, mgp = c(3, 1.9, 0))
   
-  mtext("Nation-wide river connectivity (DCI)", side = 2, cex = 2.7, line = 4.9)
-  mtext("Nation-wide capacity gain (gigawatts)", side = 1, cex = 2.7, line = 6.1)
+  mtext("Nation-wide river connectivity (DCI)", 
+        side = 2, cex = 2.7, line = 4.9)
+  mtext(paste0("Nation-wide ", prodmeasure, "gain (gigawatts)"),
+        side = 1, cex = 2.7, line = 6.1)
   
   ## Plot Panel letters
   mtext("A", side = 3, cex = 3.8, line = 1, at = 2)
@@ -97,13 +131,13 @@ plottabPareto <- function(DCIname, in_scenarios) {
   
   
   ## Plot average estimates
-  points(NationalScenarios$AddCapacity/1000, NationalScenarios$NatAverageDCI,
+  points(NationalScenarios[, prodmeasure]/1000, NationalScenarios$NatAverageDCI,
          pch = 21, col = "#42424210", bg = "#9400D310", cex = 1.6)
   
   ## Plot best and worse scenarios
-  points(Worst$AddCapacity/1000, Worst$NatAverageDCI, 
+  points(Worst[, prodmeasure]/1000, Worst$NatAverageDCI, 
          pch = 21, col = "#424242", bg = "white", cex = 2.1)
-  points(Best$AddCapacity/1000, Best$NatAverageDCI, 
+  points(Best[, prodmeasure]/1000, Best$NatAverageDCI, 
          pch = 21, col = "black", bg = "#303030", cex = 2.1)
   
   
@@ -169,30 +203,35 @@ plottabPareto <- function(DCIname, in_scenarios) {
                        BestScens_damIDs)
   
   ## Write a csv with the dataset
-  BestDemandPrint <- Best_damIDs[Best_damIDs$AddCapacity/1000 >= DemandLow & 
-                                   Best_damIDs$AddCapacity/1000 <= DemandHigh,]
+  BestDemandPrint <- Best_damIDs[Best_damIDs[, prodmeasure]/1000 >= DemandLow & 
+                                   Best_damIDs[, prodmeasure]/1000 <= DemandHigh,]
   OptimalDamPrint <- BestDemandPrint[,-'optimizedID', with=F] %>%
-    setorder('AddCapacity')
-  colnames(OptimalDamPrint) <- c("National average DCI", "Capacity gain (GW)", "N future dams",
-                                 "N future SHPs", "N future LHPs", "N free basins lost", "DamIDs")
+    setorderv(prodmeasure)
+  colnames(OptimalDamPrint) <- c("National average DCI", 
+                                 paste0(prodmeasure, " gain (GW)"),
+                                 "N future dams",
+                                 "N future SHPs", "N future LHPs", 
+                                 "N free basins lost", "DamIDs")
   write.csv(OptimalDamPrint, 
             file = file.path(resdir, 
-                             paste0("Supplement_OptimalPortifolios", DCIname, ".csv")))
+                             paste0("Supplement_OptimalPortifolios", 
+                                    DCIname, "_", 
+                                    prodmeasure, ".csv")))
   
 }
 
 #Get statistics on optimal and least-optimal scenarios
-getParetostats <- function(DCIname, in_scenarios) {
+getParetostats <- function(DCIname, prodmeasure, in_scenarios) {
   NationalScenarios <- in_scenarios
   
   Best <- psel(NationalScenarios, 
-               pref = high(NationalScenarios$AddCapacity) * high(NationalScenarios$NatAverageDCI))
+               pref = high(NationalScenarios[, prodmeasure]) * high(NationalScenarios$NatAverageDCI))
   message('Number and stats on optimal scenarios:')
   message(nrow(Best))
   message(summary(Best))
   
   Worst <- psel(NationalScenarios, 
-                pref = low(NationalScenarios$AddCapacity) * low(NationalScenarios$NatAverageDCI))
+                pref = low(NationalScenarios[, prodmeasure]) * low(NationalScenarios$NatAverageDCI))
   message(('Number and stats on least-optimal scenarios:'))
   message(nrow(Worst))
   message(summary(Worst))
@@ -203,8 +242,8 @@ getParetostats <- function(DCIname, in_scenarios) {
   DemandLow <- 120 - CurrentGen_GW
   DemandHigh <- 141 - CurrentGen_GW
   
-  BestDemand <- Best[Best$AddCapacity/1000 >= DemandLow & Best$AddCapacity/1000 <= DemandHigh, 1:7]
-  WorstDemand <- Worst[Worst$AddCapacity/1000 >= DemandLow & Worst$AddCapacity/1000 <= DemandHigh, 1:7]
+  BestDemand <- Best[Best[, prodmeasure]/1000 >= DemandLow & Best[, prodmeasure]/1000 <= DemandHigh, 1:7]
+  WorstDemand <- Worst[Worst[, prodmeasure]/1000 >= DemandLow & Worst[, prodmeasure]/1000 <= DemandHigh, 1:7]
   
   ## Calculate some statistics
   message(('Mean number of SHP - optimal:'))
@@ -228,10 +267,10 @@ getParetostats <- function(DCIname, in_scenarios) {
   message(round(sd(WorstDemand$NFutLHP), digits = 0))
   
   ## Find an example to illustrate added capacity
-  print(round(BestDemand[order(BestDemand$AddCapacity),-'scenIDs'], digits = 0)) 
+  print(round(BestDemand[order(BestDemand[, prodmeasure]),-'scenIDs'], digits = 0)) 
   ## 75 DCI      28071 GW      547 SHPs      74 LHPs         233 NFreeDammed
   
-  print(round(WorstDemand[order(WorstDemand$AddCapacity),-'scenIDs'], digits = 0))
+  print(round(WorstDemand[order(WorstDemand[, prodmeasure]),-'scenIDs'], digits = 0))
   # 67 DCI       27966 GW    1346 SHPs    146 LHPs        441 NFreeDammed
   
   # (1346-547)/1346
@@ -251,18 +290,19 @@ getParetostats <- function(DCIname, in_scenarios) {
 }
 
 #Check whether Pareto frontier approximation is good
-checkPareto <- function(DCIname, in_scenarios) {
-  NationalScenarios <- in_scenarios
+checkPareto <- function(DCIname, prodmeasure, in_scenarios) {
+  NationalScenarios <- in_scenarios[, -"scenIDs" ]
+  remove(in_scenarios)
   maxNatDCI <- NationalScenarios[, max(NatAverageDCI)]
   
   #Assess whether reaching Pareto frontier
-  nscen_seq <- c(seq(1000, nrow(NationalScenarios), 5000), nrow(NationalScenarios))
+  nscen_seq <- c(100, seq(1000, nrow(NationalScenarios), 20000), nrow(NationalScenarios))
   growfrontier_dt <- lapply(nscen_seq,
                             function(nscen) {
                               print(nscen)
                               subscens <- NationalScenarios[1:nscen, -'scenIDs', with=F]
                               sub_best <- psel(subscens,
-                                               pref = high(subscens$AddCapacity) *
+                                               pref = high(subscens[, prodmeasure]) *
                                                  high(subscens$NatAverageDCI)) %>%
                                 .[, nscen := nscen]
                               return(sub_best)
@@ -270,112 +310,54 @@ checkPareto <- function(DCIname, in_scenarios) {
   ) %>%
     rbindlist
   
+  remove(NationalScenarios)
   
   
-  growfrontier_cast <- dcast(growfrontier_dt, AddCapacity~nscen, 
+  growfrontier_cast <- dcast(growfrontier_dt, 
+                             as.formula(paste(prodmeasure,'~nscen')), 
                              value.var = 'NatAverageDCI') %>%
     setnafill(type='nocb') %>% 
-    melt(id.vars='AddCapacity', variable.name='nscen', value.name='NatAverageDCI') %>%
+    melt(id.vars=prodmeasure, variable.name='nscen', value.name='NatAverageDCI') %>%
     .[, nscen := as.numeric(as.character(nscen))] %>%
-    setorder(AddCapacity, nscen)
+    setorderv(c(prodmeasure, 'nscen'))
   
-  growfrontier_cast[, maxDCI := max(NatAverageDCI), by=AddCapacity] %>%
-    .[, DCIpercdiff := (maxDCI-NatAverageDCI)/maxDCI]
+  growfrontier_cast[, `:=`(maxDCI= max(NatAverageDCI),
+                           minDCI = min(NatAverageDCI)), by=prodmeasure] %>%
+    .[, DCIpercdiff := 100*(maxDCI-NatAverageDCI)/(maxDCI - minDCI)]
   
   growfrontier_mean <- growfrontier_cast[
     , list(DCIpercdiff=mean(DCIpercdiff, na.rm=T)), 
     by=nscen]
   
-  ggplot(growfrontier_cast, aes(x=nscen, y=DCIpercdiff)) + 
-    geom_line(aes(group=AddCapacity), alpha=1/10) + 
-    geom_line(data=growfrontier_mean, color='red', size=1.2) + 
-    theme_classic()
-    
-    
-    
-    
-    
-    
-    [, NatAverageDCImax := max(NatAverageDCI), by=AddCapacity]
+  Pareto_saturationplot <- ggplot(growfrontier_cast, aes(x=nscen, y=100-DCIpercdiff)) + 
+    geom_line(aes_string(group=eval(prodmeasure)), alpha=1/10, color='#377eb8') + 
+    scale_color_distiller(palette='Spectral') +
+    geom_line(data=growfrontier_mean, color='#d95f02', size=1.2) + 
+    scale_x_continuous(name='Number of randomly drawn nationwide dam portfolios',
+                       expand=c(0,0)) +
+    scale_y_continuous(name='DCI gain compared to Pareto Frontier from 1000 randomly drawn dam portfolios (%)',
+                       expand=c(0,0)) +
+    theme_classic() + 
+    theme(text=element_text(size=14))
   
-  growfrontierdiff <- growfrontier_dt[
-    , DCIdiff := (NatAverageDCImax - NatAverageDCI)/NatAverageDCImax,
-    by=.(nscen, AddCapacity)] 
-  
-
-  
-  ggplot(frontiersub, aes(x=AddCapacity, y=NatAverageDCI, 
-                          group=nscen, color=nscen)) + 
-    geom_smooth() +
-    scale_color_distiller(palette='Spectral') + 
-    theme_classic()
-  
-  ggplot(frontiersub, aes(x=AddCapacity, y=NatAverageDCI, 
-                          group=nscen, color=nscen)) + 
-    geom_point() +
-    scale_color_distiller(palette='Spectral') + 
-    theme_classic()
-  
-  frontiercast <- 
-  
-  ggplot(frontiercast)
-  
-
-  
-
-  
-  
-  
-  
-
-  
-  
-  paretoloess <- lapply(nscen_seq, function(in_nscen) {
-    print(in_nscen)
-    subdt <- growfrontier_dt[nscen==in_nscen,]
-    mod <- loess(formula=NatAverageDCI~AddCapacity, 
-                 data= subdt,
-                 span = 0.75, degree = 2,
-                 method = "loess")
-    
-    predx <- seq(100, NationalScenarios[, max(AddCapacity)], 100)
-    pred_dt <- data.table(AddCapacity = predx, 
-                          NatAverageDCI = predict(mod, predx),
-                          nscen = in_nscen)
-    return(pred_dt)
-  }) %>%
-    rbindlist()
-  
-  ggplot(paretoloess[nscen %in% c(1000, 6000, 11000),],
-         aes(x=AddCapacity, y=NatAverageDCI, group = nscen, color=nscen)) + 
-    geom_point(alpha=0.7) +
-    scale_color_distiller(palette='Spectral') + 
-    theme_classic()
-  
-  paretoloess_cast <- dcast(paretoloess, AddCapacity~nscen, value.var='NatAverageDCI')
-  
-  loessdiff <- mapply(function(nscen1, nscen2) {
-    print(nscen1)
-    print(nscen2)
-    diff <- paretoloess_cast[
-      ,get(as.character(nscen2))-get(as.character(nscen1))]
-    return(diff)
-  }, nscen_seq[1:(length(nscen_seq)-1)], nscen_seq[2:length(nscen_seq)]) %>%
-    as.data.table %>%
-    setnames(as.character(nscen_seq[2:length(nscen_seq)])) %>%
-    cbind(AddCapacity=paretoloess_cast[,AddCapacity]) %>%
-    melt(id.vars='AddCapacity', variable.name='nscen2', value.name='DCIdiff')
-  
-
-  ggplot(loessdiff, aes(x=nscen2, DCIdiff, group=AddCapacity)) + 
-    geom_point()
+  tiff(filename = file.path(figdir, 
+                            paste0("Revision_Paretosaturation", 
+                                   "_", prodmeasure, ".tiff")),
+       height = 3000, width = 3000, res = 300, compression = c("lzw"))
+  print(Pareto_saturationplot)
+  dev.off()
 }
 
 
+# DCIname <- 'DCIp'
+# scenarios <- getParetodat(DCIname)
+# checkPareto(DCIname, scenarios, prodmeasure = 'Capacity')
 
-for (i in c('DCIp', 'DCIi')) {
-  scenarios <- getParetodat(i)
-  plottabPareto(i, scenarios)
-  getParetostats(i, scenarios)
-  #checkPareto(i, scenarios)
+for (DCIname in c('DCIp', 'DCIi')) {
+  for (prodmeasure in c('Capacity', 'Guarantee')) {
+    scenarios <- getParetodat(DCIname)
+    plottabPareto(DCIname, prodmeasure, scenarios)
+    getParetostats(DCIname, prodmeasure, scenarios)
+    checkPareto(DCIname, prodmeasure, scenarios)
+  }
 }
