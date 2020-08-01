@@ -144,7 +144,8 @@ sample_pareto <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
                                                ".fst")))
 }
 
-for (i in 1:5) {
+for (i in 1:4) {
+  print(i)
   sample_pareto(DamAttributes = DamAttributes,
                 NetworkBRAZIL = NetworkBRAZIL,
                 DCIfunc = DCIp_opti5,

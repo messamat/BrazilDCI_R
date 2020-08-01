@@ -130,7 +130,7 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
                                           list(DAMBAS_ID08ext=j,
                                                ndams=.N,
                                                POT_KWbasin = sum(POT_KW/1000),
-                                               Guarantee := sum(fifelse(Tipo_1 == 'LHP', 0.55, 0.6)*POT_KW/1000),
+                                               Guarantee = sum(fifelse(Tipo_1 == 'LHP', 0.55, 0.6)*POT_KW/1000),
                                                SHPnum = sum(Tipo_1=='SHP'),
                                                LHPnum = sum(Tipo_1=='LHP'),
                                                DamIDs = toString(DAMID),
@@ -165,10 +165,13 @@ sample_indivdams <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname,
                                                                    Tipo_1, 
                                                                    ESTAGIO_1, 
                                                                    POT_KW/1000)]) %>%
-                              .[, Guarantee := fifelse(Tipo_1 == 'LHP', 0.55, 0.6)*POT_KW/1000]
+                              setDT
                             
                             colnames(DCIdiffstats) <- c("DAMID", "DCIMeanDiff", "DCIUppLim", "DCIDownLim", "DCIUpCI", "DCIDownCI", "Nscenarios",
-                                                        "Name", "Basin", "Type", "Situation", "Capacity", "Guarantee")
+                                                        "Name", "Basin", "Type", "Situation", "Capacity")
+                            
+                            DCIdiffstats[, Guarantee :=
+                                           fifelse(Type == 'LHP', 0.55, 0.6)*Capacity]
                             
                             return(DCIdiffstats)
             }
