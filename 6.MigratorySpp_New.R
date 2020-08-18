@@ -146,11 +146,15 @@ assess_migratoryfragment <- function(DCIname) {
   ## Create a matrix to fill in with DCI averages and CI per species and scenario
   SpMeanDCI_curr <- matrix(NA, nrow = length(spList), ncol = 8)
   rownames(SpMeanDCI_curr) <- spList
-  colnames(SpMeanDCI_curr) <- c("Curr_SHP_mean", "Curr_SHP_Upp", "Curr_SHP_Low", "Curr_LHP_mean", "Curr_LHP_Upp", "Curr_LHP_Low", "RedListed", "TopFishery")
+  colnames(SpMeanDCI_curr) <- c("Curr_SHP_mean", "Curr_SHP_Upp", "Curr_SHP_Low",
+                                "Curr_LHP_mean", "Curr_LHP_Upp", "Curr_LHP_Low",
+                                "RedListed", "TopFishery")
   
   SpMeanDCI_fut <- matrix(NA, nrow = length(spList), ncol = 8)
   rownames(SpMeanDCI_fut) <- spList
-  colnames(SpMeanDCI_fut) <- c("Fut_SHP_mean", "Fut_SHP_Upp", "Fut_SHP_Low", "Fut_LHP_mean", "Fut_LHP_Upp", "Fut_LHP_Low", "RedListed", "TopFishery")
+  colnames(SpMeanDCI_fut) <- c("Fut_SHP_mean", "Fut_SHP_Upp", "Fut_SHP_Low", 
+                               "Fut_LHP_mean", "Fut_LHP_Upp", "Fut_LHP_Low", 
+                               "RedListed", "TopFishery")
   
   
   ## Find the average DCI and CI for basins where the species i occur
@@ -405,8 +409,8 @@ assess_migratoryfragment <- function(DCIname) {
   ###########################################################
   
   ## Average current
-  mean(SpMeanDCI_curr[,1], na.rm = T)
-  mean(SpMeanDCI_curr[,4], na.rm = T)
+  mean(SpMeanDCI_curr[,1], na.rm = T) #SHP
+  mean(SpMeanDCI_curr[,4], na.rm = T) #LHP
   sd(SpMeanDCI_curr[,1], na.rm = T)
   sd(SpMeanDCI_curr[,4], na.rm = T)
   
@@ -449,7 +453,9 @@ assess_migratoryfragment <- function(DCIname) {
   
   # Future percentage
   sum(SpMeanDCI_fut[,1]/SpMeanDCI_fut[,4] > 1, na.rm = T)/FinalSpNumbFut * 100
-  sum(SpMeanDCI_fut[,1]/SpMeanDCI_fut[,4] < 1, na.rm = T)/FinalSpNumbFut * 100
+  sum(SpMeanDCI_fut[,1]/SpMeanDCI_fut[,4] < 1, na.rm = T)/FinalSpNumbFut * 100 
+  ###### Manuscript stat: Close to two-thirds (62%) of all migratory species 
+  # occupy basins that will be fragmented more by SHP compared to LHP construction in the future
   sum(SpMeanDCI_fut[,1]/SpMeanDCI_fut[,4] == 1, na.rm = T)/FinalSpNumbFut * 100
   
   
@@ -461,6 +467,8 @@ assess_migratoryfragment <- function(DCIname) {
   
   NRedList <- RedListedMean_curr[!is.na(RedListedMean_curr[,2]) == T,]
   
+  #Number of red listed species that have SHP fragmentation in at least part of their geographic range
+  length(which((RedListedMean_fut[,1]-RedListedMean_curr[,1]) < 0))
   
   ## Number of species above and below the 1:1 line -  SHP ratio < 1
   # Current raw
@@ -494,6 +502,9 @@ assess_migratoryfragment <- function(DCIname) {
   NFishery <- FisheryMean_curr[!is.na(FisheryMean_curr[,2]) == T,]
   
   
+  #Number of red listed species that have SHP fragmentation in at least part of their geographic range
+  length(which((FisheryMean_fut[,1]-FisheryMean_curr[,1]) < 0))
+  
   ## Number of species above and below the 1:1 line
   # Current raw
   sum(FisheryMean_curr[,1]/FisheryMean_curr[,4] > 1, na.rm = T)
@@ -512,10 +523,9 @@ assess_migratoryfragment <- function(DCIname) {
   sum(FisheryMean_fut[,1]/FisheryMean_fut[,4] == 1, na.rm = T)
   
   # Future percentage
-  sum(FisheryMean_fut[,1]/FisheryMean_fut[,4] > 1, na.rm = T)/dim(NFishery)[1] * 100
-  sum(FisheryMean_fut[,1]/FisheryMean_fut[,4] < 1, na.rm = T)/dim(NFishery)[1] * 100
-  sum(FisheryMean_fut[,1]/FisheryMean_fut[,4] == 1, na.rm = T)/dim(NFishery)[1] * 100
-  
+  sum((FisheryMean_fut[,1]/FisheryMean_fut[,4]) > 1, na.rm = T)/dim(NFishery)[1] * 100
+  sum((FisheryMean_fut[,1]/FisheryMean_fut[,4]) < 1, na.rm = T)/dim(NFishery)[1] * 100
+  sum((FisheryMean_fut[,1]/FisheryMean_fut[,4]) == 1, na.rm = T)/dim(NFishery)[1] * 100
   
   
   #################################################################################################
@@ -526,9 +536,9 @@ assess_migratoryfragment <- function(DCIname) {
   OrderedSppTable[OrderedSppTable$RedListed == 1, ]
   OrderedSppTable[OrderedSppTable$TopFishery == 1, ]
   
-  ## Claculate percentage change
-  SppPercSHP <- AnalysSppFut[,1] - AnalysSppCurr[,1] / AnalysSppCurr[,1] * 100
-  SppPercLHP <- AnalysSppFut[,4] - AnalysSppCurr[,4] / AnalysSppCurr[,4] * 100
+  ## Claculate percentage change between future and current
+  SppPercSHP <- 100*(AnalysSppFut[,1] - AnalysSppCurr[,1]) / AnalysSppCurr[,1]
+  SppPercLHP <- 100*(AnalysSppFut[,4] - AnalysSppCurr[,4]) / AnalysSppCurr[,4]
   
   PercChange <- as.data.frame(cbind(SppPercSHP, AnalysSppFut))
   
@@ -536,12 +546,18 @@ assess_migratoryfragment <- function(DCIname) {
   PercDataFrame[PercDataFrame$RedListed == 1, ]
   PercDataFrame[PercDataFrame$TopFishery == 1, ]
   
+  #Get the number of species that saw a loss by at least 40 in their range with dams
+  sum(PercDataFrame[PercDataFrame$RedListed == 1, 'Fut_SHP_mean']<60)/24
+  sum(PercDataFrame[PercDataFrame$TopFishery == 1, 'Fut_SHP_mean']<60)/24
+  
   ## Write a csv for the supplement
   CombinedTableSpp <- cbind(SppPercSHP, SppPercLHP, AnalysSppCurr[,1:6], AnalysSppFut)
-  # write.csv(CombinedTableSpp, file = "SupplementS1_SpeciesDCI.csv")
+  write.csv(CombinedTableSpp, 
+            file = paste0("SupplementS1_SpeciesDCI", DCIname, ".csv"))
   
   
-  ## Get the number of species that will experience a decrease in DCI of more than 40%
+  ## Get the number of species that will experience a decrease in DCI 
+  #due to SHP of more than 40% between current and future
   sum(SppPercSHP < -40)
 }
 

@@ -223,18 +223,29 @@ mapDCI <- function(DCIname, in_bas) {
   ## Upload the data
   PercChangeData <- as.data.frame(read.csv(
     file.path(resdir, paste0("DCI_Brazil_L8_Percentage", DCIname, ".csv"))))
-  JuruenaBasinsOverall <- read.csv("JuruenaOverall.txt")
-  JuruenaBasinsDams <- read.csv("JuruenaWithDams.txt")
-  TapajosBasinsOverall <- read.csv("TapajosOverall.txt")
-  TapajosBasinsDams <- read.csv("TapajosWithDams.txt")
+  
+  #Get HYBAS data level 08 and merge with DCI results
+  basinatlas_l8merge <- merge(
+    st_read(dsn = dcigdb, layer = 'BasinATLAS_lev08_v10_brproj')[, c('HYBAS_ID', 'PFAF_ID')],
+    PercChangeData,
+    by='HYBAS_ID',
+    all.x=T
+  ) %>%
+    setDT
+  
+  #Subset to keep only data for Tapajos and Juruena basins
+  #Tapajos HydroBASINS level 4: HYBAS_ID 6040262220 PFAF_ID 6224
+  #Juruena HydroBASINS level 5: HYBAS_ID 6050405310 PFAF_ID 62244 
+  tapajosbasins <- basinatlas_l8merge[substr(as.character(PFAF_ID), 1, 4)=='6224',]
+  juruenabasins <- basinatlas_l8merge[substr(as.character(PFAF_ID), 1, 5)=='62244',] 
   
   ## Get the number of basins without future dams
-  JuruenaFree <- dim(JuruenaBasinsOverall)[1] - dim(JuruenaBasinsDams)[1]
-  TapajosFree <- dim(TapajosBasinsOverall)[1] - dim(TapajosBasinsDams)[1]
+  JuruenaFree <- juruenabasins[is.na(PercLoss_All), .N]
+  TapajosFree <- tapajosbasins[is.na(PercLoss_All), .N]
   
   ## Filter results for basins inside Juruena and Tapajos
-  JuruenaPercDam <- PercChangeData[PercChangeData$HYBAS_ID %in% JuruenaBasinsDams$HYBAS_ID, ]
-  TapajosPercDam <- PercChangeData[PercChangeData$HYBAS_ID %in% TapajosBasinsDams$HYBAS_ID, ]
+  JuruenaPercDam <- juruenabasins[!is.na(PercLoss_All),]
+  TapajosPercDam <- tapajosbasins[!is.na(PercLoss_All),]
   
   message("Order")
   message(JuruenaPercDam[order(JuruenaPercDam$PercLoss_SHP), ]) 
