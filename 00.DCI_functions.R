@@ -15,80 +15,6 @@ if (!file.exists(figdir)) {
 }
 
 #DCI for potadromous species
-DCIp_opti3 <- function(d2, d3, print = NULL){
-  "d2 = a data frame containing the links between patches and passability for each link
-  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
-  d2$id2 = final segment (to) connection; MUST BE FACTOR!
-  d2$pass = the passability from one segment to the next
-  
-  d3 = data frame containing all segments and its respective sizes
-  d3$id = the ID of each segment; MUST BE FACTOR!
-  d3$l = the SIZE of segments formed by barriers within a given river
-  
-  OBS: d2 and d3 must have the same segment names (ID)
-  d = edges; vertices = nodes"
-  
-  graph <- igraph::graph.data.frame(d2, directed = F); #plot(graph)
-  
-  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin
-  d3[,l_L := l/sum(l)] %>%
-    setkey(id)
-  
-  #Get pair-wise DCI for lower triangle of matrix of all pairwise combination of segments (excluding diagonal)
-  if (max(d2$pass) == 0) {
-    lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
-      setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>% #Convert to data.table and rename columns
-      merge(d3, by.x='i', by.y='id', all.y=F) %>% #Get size of segments (may be sped up with key-based match)
-      merge(d3, by.x='k', by.y='id', all.y=F) %>%
-      .[, 100 * l_L.x * l_L.y * 0, #Compute DCI from each segment i to all other segments
-        by=seq_len(nrow(.))]
-  } else {
-    lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
-      setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>% #Convert to data.table and rename columns
-      merge(d3, by.x='i', by.y='id', all.y=F) %>% #Get size of segments (may be sped up with key-based match)
-      merge(d3, by.x='k', by.y='id', all.y=F) %>%
-      .[, 100 * l_L.x * l_L.y * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
-        by=seq_len(nrow(.))]
-  }
-
-  #Compute DCI by sum connectivity for full matrix of pairwise combination 
-  return(lowertricomb[, 2*sum(V1)]+d3[,100*sum(l_L^2)]) #Sum DCI across matrix of pairwise combinations of segments (2*lower triangle + diagonal)
-}
-
-DCIp_opti4 <- function(d2, d3, print = NULL){	
-  "d2 = a data frame containing the links between patches and passability for each link	
-  d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!	
-  d2$id2 = final segment (to) connection; MUST BE FACTOR!	
-  d2$pass = the passability from one segment to the next	
-  	
-  d3 = data frame containing all segments and its respective sizes	
-  d3$id = the ID of each segment; MUST BE FACTOR!	
-  d3$l = the SIZE of segments formed by barriers within a given river	
-  	
-  OBS: d2 and d3 must have the same segment names (ID)	
-  d = edges; vertices = nodes"	
-  
-  graph <- graph.data.frame(d2, directed = F); #plot(graph)	
-  
-  #calculating l_i/L ratio - for each segment, the sum of that segment to that of all segments in basin	
-  d3[,l_L := l/sum(l)]	
-  
-  #Get lower triangle of matrix of all pairwise combination of segments	
-  lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%	
-    merge(d3, by.x='i', by.y='id', all.y=F) %>%	
-    merge(d3, by.x='k', by.y='id', all.y=F) 	
-  
-  lowercomp <- unlist(lapply(lowertricomb[, unique(i)], function(c) {	
-    lowertricomb[i==c, 100 * l_L.x * l_L.y] *	
-      unlist(	
-        lapply(shortest_paths(graph, from = c, to = lowertricomb[i==c,k], output = "epath")$epath, function(epath) {	
-          prod(epath$pass)	
-        })	
-      )	
-  }))
-  return(2*sum(lowercomp)+d3[,100*sum(l_L^2)])
-}
-
 DCIp_opti5 <- function(d2, d3, print = NULL){
   "d2 = a data frame containing the links between patches and passability for each link
   d2$id1 = initial segment (FROM) connection; MUST BE FACTOR!
@@ -120,7 +46,7 @@ DCIp_opti5 <- function(d2, d3, print = NULL){
       setkey(i) %>%  .[d3] %>%
       setkey(k) %>%  .[d3] %>%
       .[!is.na(i)] %>%
-      .[, 100 * l_L * i.l_L * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass), #Compute DCI from each segment i to all other segments
+      .[, 100 * l_L * i.l_L * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass**2), #Compute DCI from each segment i to all other segments
         by=1:nrow(.)]
     
     #Compute DCI by sum connectivity for full matrix of pairwise combination 
@@ -154,13 +80,13 @@ DCIi_opti <- function(d2, d3, print = NULL){
   #get segment at mouth of network
   mouthsegID <- unique(d2$id1)[!(unique(d2$id1) %in% unique(d2$id2))]
   
-  #Get lower triangle of matrix of all pairwise combination of segments
+  #Get lower triangle of matrix of all pairwise combination of mouth by segments
   mouthcomb <- data.table(i= rep(mouthsegID, length(d3$id)), j=d3$id)
   
   DCImatd <- function(x) {
     #Compute connectivity for all unique pairs of segments in basin (for diadromous species)
     #Note: when from= and to= are the same in shortest_paths, returns an empty numeric that, when fed to prod, returns 1
-    return(prod(igraph::shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass) *
+    return(prod(igraph::shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass**2) *
              d3[d3$id==x[2],'l_L'][[1]] *
              100) 
   }
