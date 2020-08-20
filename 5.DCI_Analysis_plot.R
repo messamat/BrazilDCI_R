@@ -244,11 +244,14 @@ DCIplot2 <- function(DCIname) {
   message(min(PercLoss_SHP))
   message(max(PercLoss_SHP))
   
-  message("SHPs future % change values")
+  message("LHPs future % change values")
   message(mean(PercLoss_LHP))
   message(sd(PercLoss_LHP))
   message(min(PercLoss_LHP))
   message(max(PercLoss_LHP))
+  
+  message("Free-flowing Number of basins that will have SHPs in the future")
+  message(sum(PercLoss_Free_SHP < 0))
   
   message("Free-flowing All future % change values")
   message(mean(PercLoss_Free_All))
@@ -315,9 +318,9 @@ DCIplot2 <- function(DCIname) {
     
   }
   
-  message("mean(LinearDistKm)")
+  message("Mean stream network distance in level 8 basins: mean(LinearDistKm)")
   message(mean(LinearDistKm))
-  message("sum(NPortifolios)")
+  message("Total number of within-basin future dam portfolios: sum(2^NFutDams) across basins")
   message(sum(NPortifolios))
   
   ##################################################################################
@@ -466,5 +469,5 @@ DCIplot2 <- function(DCIname) {
   dev.off()
 }
 
-DCIplot2('DCIp')
-DCIplot2('DCIi')
+DCIplot2(DCIname='DCIp')
+DCIplot2(DCIname='DCIi')
