@@ -238,6 +238,9 @@ mapDCI <- function(DCIname, in_bas) {
   #Juruena HydroBASINS level 5: HYBAS_ID 6050405310 PFAF_ID 62244 
   tapajosbasins <- basinatlas_l8merge[substr(as.character(PFAF_ID), 1, 4)=='6224',]
   juruenabasins <- basinatlas_l8merge[substr(as.character(PFAF_ID), 1, 5)=='62244',] 
+  buritibasin <- basinatlas_l8merge[substr(as.character(PFAF_ID), 1, 4)=='6224',]
+  cuparileste <- basinatlas_l8merge[PFAF_ID=='62241404',] 
+
   
   ## Get the number of basins without future dams
   JuruenaFree <- juruenabasins[is.na(PercLoss_All), .N]
