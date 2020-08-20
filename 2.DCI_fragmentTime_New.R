@@ -290,12 +290,12 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
 }
 
 
-# damfragment_time(DamAttributes = DamAttributes,
-#                  NetworkBRAZIL = NetworkBRAZIL,
-#                  DCIfunc = DCIp_opti5,
-#                  DCIname = 'DCIp')
-# 
-# 
+damfragment_time(DamAttributes = DamAttributes,
+                 NetworkBRAZIL = NetworkBRAZIL,
+                 DCIfunc = DCIp_opti5,
+                 DCIname = 'DCIp')
+
+
 # damfragment_time(DamAttributes = DamAttributes,
 #                  NetworkBRAZIL = NetworkBRAZIL,
 #                  DCIfunc = DCIi_opti,
@@ -322,61 +322,53 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   # Read table for the future projections per basin
   resuDCI <- as.data.frame(read.csv(
     file.path(resdir,
-              paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T))
+              paste0("DCI_Brazil_L8_", DCIname, ".csv")), header = T)) %>%
+    setDT
   
   ## Create a vector of years
   YearVec <- seq(from = 1899, to = 2018)
   
-  ## Calculate the average decrease in absolute values of DCI
-  # All current
-  initialStage <- rep(100, times = length(resuDCI$All_curr))
-  mean(initialStage - resuDCI$All_curr)
+  #Number of future dams
+  DamAttributes[DamAttributes$ESTAGIO_1 == 'Planned', .N]
   
+  ## Calculate the average decrease in absolute values of DCI
+  # All current 
+  resuDCI[, mean(100 - All_curr)] #DCI
   # All future
-  initialStage <- rep(100, times = length(resuDCI$All_fut))
-  mean(initialStage - resuDCI$All_fut)
+  resuDCI[, mean(All_curr - All_fut)] #DCI
+  resuDCI[, 100*mean((All_curr - All_fut)/All_curr)] #% DCI
   
   # SHP current
-  initialStage <- rep(100, times = length(resuDCI$SHP_curr))
-  mean(initialStage - resuDCI$SHP_curr)
+  resuDCI[, mean(100 - SHP_curr)] #DCI
   
   # SHP future
-  initialStage <- rep(100, times = length(resuDCI$SHP_fut))
-  mean(initialStage - resuDCI$SHP_fut)
+  resuDCI[, 100*mean((SHP_curr - SHP_fut)/SHP_curr)] #DCI
   
   # LHP current
-  initialStage <- rep(100, times = length(resuDCI$LHP_curr))
-  mean(initialStage - resuDCI$LHP_curr)
+  resuDCI[, mean(100 - LHP_curr)]
   
   # LHP future
-  initialStage <- rep(100, times = length(resuDCI$LHP_fut))
-  mean(initialStage - resuDCI$LHP_fut)
+  resuDCI[, 100*mean((LHP_curr - LHP_fut)/LHP_curr)]
   
   
   ## Calculate the standard deviation for decrease in DCI
   # All current
-  initialStage <- rep(100, times = length(resuDCI$All_curr))
-  sd(initialStage - resuDCI$All_curr)
+  resuDCI[, sd(100 - All_curr)]
   
   # All future
-  initialStage <- rep(100, times = length(resuDCI$All_fut))
-  sd(initialStage - resuDCI$All_fut)
+  resuDCI[, sd(All_curr - All_fut)]
   
   # SHP current
-  initialStage <- rep(100, times = length(resuDCI$SHP_curr))
-  sd(initialStage - resuDCI$SHP_curr)
+  resuDCI[, sd(100 - SHP_curr)] #DCI
   
   # SHP future
-  initialStage <- rep(100, times = length(resuDCI$SHP_fut))
-  sd(initialStage - resuDCI$SHP_fut)
+  resuDCI[, sd(100 - SHP_fut)] #DCI
   
   # LHP current
-  initialStage <- rep(100, times = length(resuDCI$LHP_curr))
-  sd(initialStage - resuDCI$LHP_curr)
+  resuDCI[, sd(100 - LHP_curr)] #DCI
   
   # LHP future
-  initialStage <- rep(100, times = length(resuDCI$LHP_fut))
-  sd(initialStage - resuDCI$LHP_fut)
+  resuDCI[, sd(100 - LHP_fut)] #DCI
   
   
   ## Calculate the range of the decrease
@@ -396,6 +388,8 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   100 - max(resuDCI$LHP_curr)
   100 - min(resuDCI$LHP_curr)
   
+  #Max decrease in % DCI
+  resuDCI[, max((All_curr - All_fut)/All_curr)]
   
   ## Calculate rates of decrease per year (I did the first round in excel)
   
@@ -439,6 +433,9 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   round(mean(YearRatesMatSHP[61:100,2]), digits = 2) ## 1960 -1999
   round(mean(YearRatesMatSHP[101:119,2]), digits = 2) ##2000 - 2018
   
+################################################################################
+############################### DCIi ANALYSIS ##################################
+################################################################################
   
   DCIname <- 'DCIi'
   
