@@ -65,7 +65,7 @@ plotindivdams_util <- function(RankedDams, DCIname, prodmeasure) {
          bg = as.vector(TypeColor), cex = 2.5)
   
   ## Plot legend
-  legend(x = 0.1, y = 0.8*maxdiffceil, pch = c(21), legend = c("Planned SHP", "Planned LHP"), cex = 2.5,
+  legend(x = 0.1, y = 0.7*maxdiffceil, pch = c(21), legend = c("Planned SHP", "Planned LHP"), cex = 2.5,
          pt.cex = 3.3, pt.bg = c("#8B000060","#4876FF60"), xpd = T, bty = "n")
   
   dev.off()
@@ -105,7 +105,7 @@ plotindivdams <- function(DamAttributes, DCIname, prodmeasure) {
   
   ## All
   overallLm <- lm(log(RankedDams$DCIMeanDiff) ~ log(RankedDams[, get(prodmeasure)]))
-  message(summary(overallLm))
+  summary(overallLm)
   hist(overallLm$resid, main="Histogram of Residuals",
        ylab="Residuals")
   qqnorm(overallLm$resid)
@@ -114,11 +114,11 @@ plotindivdams <- function(DamAttributes, DCIname, prodmeasure) {
   abline(overallLm)
   
   message("cor.test(x=log(RankedDams[, get(prodmeasure)]), y=log(RankedDams$DCIMeanDiff), method = 'pearson')")
-  message(cor.test(x=log(RankedDams[, get(prodmeasure)]), y=log(RankedDams$DCIMeanDiff), method = 'pearson'))
+  cor.test(x=log(RankedDams[, get(prodmeasure)]), y=log(RankedDams$DCIMeanDiff), method = 'pearson')
   
   ## Just SHPs
   SHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "SHP"]) ~ log(RankedDams[, get(prodmeasure)][RankedDams$Type == "SHP"]))
-  message(summary(SHPLm))
+  summary(SHPLm)
   hist(SHPLm$resid, main="Histogram of Residuals",
        ylab="Residuals")
   qqnorm(SHPLm$resid)
@@ -127,7 +127,7 @@ plotindivdams <- function(DamAttributes, DCIname, prodmeasure) {
   abline(SHPLm)
   
   message("cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'SHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'SHP']), method = 'pearson')")
-  message(cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'SHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'SHP']), method = 'pearson'))
+  print(cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'SHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'SHP']), method = 'pearson'))
   
   ## Just LHPs
   LHPLm <- lm(log(RankedDams$DCIMeanDiff[RankedDams$Type == "LHP"]) ~ log(RankedDams[, get(prodmeasure)][RankedDams$Type == "LHP"]))
@@ -140,7 +140,7 @@ plotindivdams <- function(DamAttributes, DCIname, prodmeasure) {
   abline(LHPLm)
   
   message("cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'LHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'LHP']), method = 'pearson')")
-  message(cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'LHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'LHP']), method = 'pearson'))
+  cor.test(x=log(RankedDams[, get(prodmeasure)][RankedDams$Type == 'LHP']), y=log(RankedDams$DCIMeanDiff[RankedDams$Type == 'LHP']), method = 'pearson')
   
   ## Create a csv of future dams rank basend on mean DCI
   RankedDams_format <- RankedDams[DamAttributes[, .(DAMID, POINT_X, POINT_Y)],
