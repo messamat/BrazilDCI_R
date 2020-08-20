@@ -6,6 +6,7 @@
 source('00.DCI_packages.R')
 #Import directory structure and functions
 source('00.DCI_functions.R')
+memory.limit(size=50000)
 
 #Import formatted data
 DamAttributes <- read.fst(file.path(resdir, 'DamAttributes.fst')) %>% setDT
@@ -16,38 +17,42 @@ getParetodat <- function(DCIname) {
   #Import scenarios
   nationalfiles <- list.files(path=resdir,
                               pattern=paste0("NationalScen_", DCIname, "_.*[.]fst"))
+  
+
   NationalScenarios <- read.fst(file.path(resdir, nationalfiles[1])) %>%
     setDT %>%
     unique(by='scenIDs') 
   
-  NationalScenarios2 <- read.fst(file.path(resdir, nationalfiles[2])) %>%
-    setDT %>%
-    unique(by='scenIDs') 
-  
-  NationalScenarios3 <- read.fst(file.path(resdir, nationalfiles[3])) %>%
-    setDT %>%
-    unique(by='scenIDs') 
-  
-  NationalScenarios <- rbind(NationalScenarios, 
-                             NationalScenarios2,
-                             NationalScenarios3) %>%
-    unique(by='scenIDs')
-  
-  remove(NationalScenarios2)
-  remove(NationalScenarios3)
-  
-  NationalScenarios4 <- read.fst(file.path(resdir, nationalfiles[4])) %>%
-    setDT %>%
-    unique(by='scenIDs') 
-  
-  NationalScenarios5 <- read.fst(file.path(resdir, nationalfiles[5])) %>%
-    setDT %>%
-    unique(by='scenIDs') 
-  
-  NationalScenarios <- rbind(NationalScenarios, 
-                             NationalScenarios4,
-                             NationalScenarios5) %>%
-    unique(by='scenIDs')
+  if (DCIname == 'DCIp') {
+    NationalScenarios2 <- read.fst(file.path(resdir, nationalfiles[2])) %>%
+      setDT %>%
+      unique(by='scenIDs') 
+    
+    NationalScenarios3 <- read.fst(file.path(resdir, nationalfiles[3])) %>%
+      setDT %>%
+      unique(by='scenIDs') 
+    
+    NationalScenarios <- rbind(NationalScenarios, 
+                               NationalScenarios2,
+                               NationalScenarios3) %>%
+      unique(by='scenIDs')
+    
+    remove(NationalScenarios2)
+    remove(NationalScenarios3)
+    
+    NationalScenarios4 <- read.fst(file.path(resdir, nationalfiles[4])) %>%
+      setDT %>%
+      unique(by='scenIDs') 
+    
+    NationalScenarios5 <- read.fst(file.path(resdir, nationalfiles[5])) %>%
+      setDT %>%
+      unique(by='scenIDs') 
+    
+    NationalScenarios <- rbind(NationalScenarios, 
+                               NationalScenarios4,
+                               NationalScenarios5) %>%
+      unique(by='scenIDs')
+  }
   
   return(NationalScenarios)
 }
@@ -117,9 +122,15 @@ plottabPareto <- function(DCIname, prodmeasure, in_scenarios) {
     
     mtext("Nation-wide river connectivity (DCI)", 
           side = 2, cex = 2.7, line = 4.9)
-    mtext(paste0("Nation-wide ", prodmeasure, "gain (gigawatts)"),
-          side = 1, cex = 2.7, line = 6.1)
-    
+    if (prodmeasure == 'AddCapacity') {
+      mtext(paste0("Nation-wide generation capacity gain (gigawatts)"),
+            side = 1, cex = 2.7, line = 6.1)
+    }
+    if (prodmeasure == 'AddGuarantee') {
+      mtext(paste0("Nation-wide physical guarantee gain (gigawatts)"),
+            side = 1, cex = 2.7, line = 6.1)
+    }
+
     ## Plot Panel letters
     mtext("A", side = 3, cex = 3.8, line = 1, at = 2)
     mtext("B", side = 3, cex = 3.8, line = 1, at = 40)
@@ -257,6 +268,12 @@ getParetostats <- function(DCIname, prodmeasure, in_scenarios) {
                          Worst[, get(prodmeasure)]/1000 <= DemandHigh, 1:7]
   
   ## Calculate some statistics
+  message('Number of optimal scenarios within demand window:')
+  message(nrow(BestDemand))
+  
+  message('Number of least-optimal scenarios within demand window:')
+  message(nrow(WorstDemand))
+  
   message(('Mean number of SHP - optimal:'))
   message(round(mean(BestDemand$NFutSHP), digits = 0))
   message(('Mean number of LHP - optimal:'))
@@ -279,14 +296,14 @@ getParetostats <- function(DCIname, prodmeasure, in_scenarios) {
   
   ## Find an example to illustrate added capacity
   print(round(BestDemand[order(BestDemand[, get(prodmeasure)]),-'scenIDs'], digits = 0)) 
-  ## 75 DCI      28071 GW      547 SHPs      74 LHPs         233 NFreeDammed
+  ## 77 DCI      25430 GW      449 SHPs      58 LHPs         204 NFreeDammed
   
   print(round(WorstDemand[order(WorstDemand[, get(prodmeasure)]),-'scenIDs'], digits = 0))
-  # 67 DCI       27966 GW    1346 SHPs    146 LHPs        441 NFreeDammed
+  ## 68 DCI      25389 GW    1233 SHPs    135 LHPs        408 NFreeDammed
   
-  # (1346-547)/1346
-  # (146-74)/146
-  # (441-233)/441
+  # (1233-449)/1233
+  # (135-58)/135
+  # (408-204)/408
   
   ## Free-flowing statistics
   message('mean(BestDemand$NFreeDammed)')
@@ -304,6 +321,8 @@ getParetostats <- function(DCIname, prodmeasure, in_scenarios) {
 checkPareto <- function(DCIname, prodmeasure, in_scenarios) {
   outfig <- file.path(figdir, paste0("Revision_Paretosaturation", 
                                      "_",
+                                     DCIname,
+                                     '_',
                                      prodmeasure, 
                                      Sys.Date(),
                                      ".tiff"))
@@ -313,10 +332,12 @@ checkPareto <- function(DCIname, prodmeasure, in_scenarios) {
     
     NationalScenarios <- in_scenarios[, -"scenIDs" ]
     remove(in_scenarios)
+    gc()
+    
     maxNatDCI <- NationalScenarios[, max(NatAverageDCI)]
     
     #Assess whether reaching Pareto frontier
-    nscen_seq <- c(100, seq(1000, nrow(NationalScenarios), 20000), nrow(NationalScenarios))
+    nscen_seq <- c(100, seq(1000, nrow(NationalScenarios), 25000), nrow(NationalScenarios))
     growfrontier_dt <- lapply(nscen_seq,
                               function(nscen) {
                                 #print(nscen)
@@ -331,7 +352,7 @@ checkPareto <- function(DCIname, prodmeasure, in_scenarios) {
       rbindlist
     
     remove(NationalScenarios)
-    
+    gc()
     
     growfrontier_cast <- dcast(growfrontier_dt, 
                                as.formula(paste(prodmeasure,'~nscen')), 
@@ -377,7 +398,7 @@ checkPareto <- function(DCIname, prodmeasure, in_scenarios) {
 for (DCIname in c('DCIp', 'DCIi')) {
   for (prodmeasure in c('Capacity', 'Guarantee')) {
     print(DCIname)
-    print(DCImeasure)
+    print(prodmeasure)
     print('Get scenarios...')
     in_scenarios <- getParetodat(DCIname)
     print('Get plot and tab...')
