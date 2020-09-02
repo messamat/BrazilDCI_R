@@ -74,10 +74,20 @@ plottabPareto <- function(DCIname, prodmeasure, in_scenarios) {
   summary(Worst)
   
   ## Define the window of future demands
-  CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
+  ## Define the window of future demands
+  if (prodmeasure == 'AddCapacity') {
+    CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
+    DemandLow <- 120 - CurrentGen_GW
+    DemandHigh <- 141 - CurrentGen_GW
+  }
   
-  DemandLow <- 120 - CurrentGen_GW
-  DemandHigh <- 141 - CurrentGen_GW
+  if (prodmeasure == 'AddGuarantee') {
+    CurrentGen_GW <- (DamAttributes[ESTAGIO_1 == "Operation" & Tipo_1 == 'LHP', 0.55*sum(POT_KW)] + 
+                        DamAttributes[ESTAGIO_1 == "Operation" & Tipo_1 == 'SHP', 0.59*sum(POT_KW)])/1000/1000
+    DemandLow <- (0.57*120 - CurrentGen_GW)
+    DemandHigh <- (0.57*141 - CurrentGen_GW)
+  }
+  
   
   BestDemand <- Best[Best[, get(prodmeasure)]/1000 >= DemandLow & 
                        Best[, get(prodmeasure)]/1000 <= DemandHigh, 1:7]
@@ -137,9 +147,13 @@ plottabPareto <- function(DCIname, prodmeasure, in_scenarios) {
     mtext("C", side = 3, cex = 3.8, line = -26, at = 55)
     
     ## Plot Max and min future energy demands
-    segments(x0 = 15, x1 = 15, y0 = 0, y1 = 85, col = "gray60", lty = 3, lwd = 4)
-    segments(x0 = 36, x1 = 36, y0 = 0, y1 = 85, col = "gray60", lty = 3, lwd = 4)
+    segments(x0 = DemandLow, x1 = DemandLow, y0 = 0, y1 = 85, col = "gray60", lty = 3, lwd = 4)
+    segments(x0 = DemandHigh, x1 = DemandHigh, y0 = 0, y1 = 85, col = "gray60", lty = 3, lwd = 4)
     
+    ## Plot years of demands
+    mtext("2030", side = 2, cex = 1.7, line = -(DemandLow + 2.5), at = 87)
+    mtext("2040", side = 2, cex = 1.7, line = -(DemandHigh + 2.5), at = 87)
+
     ## Plot average estimates
     points(in_scenarios[, get(prodmeasure)]/1000, in_scenarios$NatAverageDCI,
            pch = 21, col = "#42424210", bg = "#9400D310", cex = 1.6)
@@ -257,10 +271,18 @@ getParetostats <- function(DCIname, prodmeasure, in_scenarios) {
   message(summary(Worst))
   
   ## Define the window of future demands
-  CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
-  
-  DemandLow <- 120 - CurrentGen_GW
-  DemandHigh <- 141 - CurrentGen_GW
+  if (prodmeasure == 'AddCapacity') {
+    CurrentGen_GW <- sum(DamAttributes$POT_KW[which(DamAttributes$ESTAGIO_1 == "Operation")])/1000/1000
+    DemandLow <- 120 - CurrentGen_GW
+    DemandHigh <- 141 - CurrentGen_GW
+  }
+
+  if (prodmeasure == 'AddGuarantee') {
+    CurrentGen_GW <- (DamAttributes[ESTAGIO_1 == "Operation" & Tipo_1 == 'LHP', 0.55*sum(POT_KW)] + 
+                        DamAttributes[ESTAGIO_1 == "Operation" & Tipo_1 == 'SHP', 0.59*sum(POT_KW)])/1000/1000
+    DemandLow <- (0.57*120 - CurrentGen_GW)
+    DemandHigh <- (0.57*141 - CurrentGen_GW)
+  }
   
   BestDemand <- Best[Best[, get(prodmeasure)]/1000 >= DemandLow & 
                        Best[, get(prodmeasure)]/1000 <= DemandHigh, 1:7]
@@ -404,12 +426,12 @@ for (DCIname in c('DCIp', 'DCIi')) {
     print('Get plot and tab...')
     plottabPareto(DCIname, prodmeasure, in_scenarios)
     gc()
-    print('Get Pareto stats..')
-    getParetostats(DCIname, prodmeasure, in_scenarios)
-    gc()
-    print('Check Pareto saturation..')
-    checkPareto(DCIname, prodmeasure, in_scenarios)
-    remove(in_scenarios)
+    # print('Get Pareto stats..')
+    # getParetostats(DCIname, prodmeasure, in_scenarios)
+    # gc()
+    # print('Check Pareto saturation..')
+    # checkPareto(DCIname, prodmeasure, in_scenarios)
+    # remove(in_scenarios)
     gc()
   }
 }

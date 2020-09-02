@@ -42,11 +42,12 @@ DCIp_opti5 <- function(d2, d3, print = NULL){
     
     #Get pair-wise DCI for lower triangle of matrix of all pairwise combination of segments (excluding diagonal)
     lowertricomb <- d3[, list(RcppAlgos::comboGeneral(id, 2))] %>% #Get all combinations of ids
-      setDT %>% setnames(c('V1', 'V2'), c('i', 'k')) %>%
+      setDT %>% 
+      setnames(c('V1', 'V2'), c('i', 'k')) %>%
       setkey(i) %>%  .[d3] %>%
       setkey(k) %>%  .[d3] %>%
       .[!is.na(i)] %>%
-      .[, 100 * l_L * i.l_L * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass**2), #Compute DCI from each segment i to all other segments
+      .[, 100 * l_L * i.l_L * prod(igraph::shortest_paths(graph, from = i, to = k, output = "epath")$epath[[1]]$pass),  #Compute DCI from each segment i to all other segments
         by=1:nrow(.)]
     
     #Compute DCI by sum connectivity for full matrix of pairwise combination 
@@ -86,7 +87,7 @@ DCIi_opti <- function(d2, d3, print = NULL){
   DCImatd <- function(x) {
     #Compute connectivity for all unique pairs of segments in basin (for diadromous species)
     #Note: when from= and to= are the same in shortest_paths, returns an empty numeric that, when fed to prod, returns 1
-    return(prod(igraph::shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass**2) *
+    return(prod(igraph::shortest_paths(graph, from = x[1], to = x[2], output = "epath")$epath[[1]]$pass) *
              d3[d3$id==x[2],'l_L'][[1]] *
              100) 
   }

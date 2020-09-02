@@ -118,6 +118,8 @@ if (!file.exists("MigratorySpp_BasinID_L8.txt")) {
   
   ### Create the final data frame and export it as a csv
   MigFishGeneralData <- cbind(FID, MigFishGen, RedListed, Fisheries)
+  
+  
   write.csv(MigFishGeneralData, file = "MigSpeciesForGIS.csv")
   
   
@@ -550,10 +552,16 @@ assess_migratoryfragment <- function(DCIname) {
   sum(PercDataFrame[PercDataFrame$RedListed == 1, 'Fut_SHP_mean']<60)/24
   sum(PercDataFrame[PercDataFrame$TopFishery == 1, 'Fut_SHP_mean']<60)/24
   
+  ##Get data frame of basins in which each species occurs
+  SpBasins <- as.data.table(SppData_L8)[HYBAS_ID != '0', list(HYBAS_ID = paste(HYBAS_ID, collapse = ', ')), by=Species]
+  
   ## Write a csv for the supplement
   CombinedTableSpp <- cbind(SppPercSHP, SppPercLHP, AnalysSppCurr[,1:6], AnalysSppFut)
-  write.csv(CombinedTableSpp, 
-            file = paste0("SupplementS1_SpeciesDCI", DCIname, ".csv"))
+  CombinedTableSppBas <- merge(as.data.table(CombinedTableSpp, keep.rownames = 'Species'), SpBasins, by='Species')
+  
+  write.csv(CombinedTableSppBas, 
+            file = file.path(resdir, 
+                             paste0("SupplementS1_SpeciesDCIBas", DCIname, ".csv")))
   
   
   ## Get the number of species that will experience a decrease in DCI 
