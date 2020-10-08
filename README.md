@@ -8,7 +8,7 @@ on river connectivity for thousands of current and projected-future dams across 
 
 ## Set-up
 All analysis was perform in R 4.0.  
-We used a project structure with dependency (package) management using renv (See [renv reference] {https://rstudio.github.io/renv/articles/renv.html}).  
+We used a project structure with dependency (package) management using renv (See [renv reference] (https://rstudio.github.io/renv/articles/renv.html)).  
 When one launches this project, renv should automatically bootstrap itself, 
 thereby downloading and installing the appropriate version of renv into the 
 project library. After this has completed, one can then use renv::restore() 
@@ -41,7 +41,7 @@ To proceed with the analysis, run the scripts in the following order
 - 1.DCIAnalysis_New: compute DCI for current and future scenarios; for SHP-only, LHP-only, and all dams  
 - 2.DCI_fragmentTime_New.R: compute DCI over time, generate Figure 1, get statistics for manuscript  
 - 3.DCI_SamplingIndividualDams_NewFast.R: compute DCI for every possible dam-building scenario by basin, compute DCI loss with and without individual dams  
-- 4.DCI_SamplingPareto_New.R: Run sampling based pareto-front analysis. Sample five million future dam portfolios  .  
+- 4.DCI_SamplingPareto_New.R: Run sampling based pareto-front analysis. Sample five million future dam portfolios.    
 - 5.DCI_Analysis_plot.R: plot figure 2. get statistics for manuscript.  
 - 6.MigratorySpp_New.R: analyze data for migratory species. produce figure 4 and statistics.  
 - 7.DCI_map.R: plot figure 3 (map)  
