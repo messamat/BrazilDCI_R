@@ -1,5 +1,5 @@
-# BrazilDCI_R
-Source code for Safeguarding migratory fish via strategic planning of future small hydropower in Brazil. 
+# Safeguarding migratory fish via strategic planning of future small hydropower in Brazil
+Source code for research article: 
 Thiago B. A. Couto, Mathis L. Messager & Julian D. Olden
 
 ## Set-up
