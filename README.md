@@ -2,7 +2,7 @@
 Source code for Safeguarding migratory fish via strategic planning of future small hydropower in Brazil. 
 Thiago B. A. Couto, Mathis L. Messager & Julian D. Olden
 
-##Set-up
+## Set-up
 All analysis was perform in R 4.0.  
 We used a project structure with dependency (package) management using renv (See [renv reference] {https://rstudio.github.io/renv/articles/renv.html}).  
 When one launches this project, renv should automatically bootstrap itself, 
@@ -23,7 +23,7 @@ they do not need to re-use the environment from previous scripts
 (e.g. one can run 1.DCIAnalysis_New, clear their environment, 
 and then run 2.DCI_fragmentTime_New)	
 
-##Workflow
+## Workflow
 00.DCI_functions.R and 00.DCI_packages.R: do not need to be run manually,
 they are sourced from subsequent codes. 
 
