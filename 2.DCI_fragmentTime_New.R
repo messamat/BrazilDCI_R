@@ -102,7 +102,7 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
             UpSeg <- paste("seg", DamX$UpSeg, sep ="")
             Type <- DamX$Tipo_1
             Situation <- DamX$ESTAGIO_1
-            ID_number <- DamX$TARGET_FID
+            ID_number <- DamX$DAMID
             ID_name <- DamX$NOME
             Basin <- DamX$DAMBAS_ID08
             Year <- DamX$INIC_OPER
