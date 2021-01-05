@@ -50,3 +50,6 @@ To proceed with the analysis, run the scripts in the following order
 - DCI_IndividualsDams_plot.R: produce figure 5  
 - DCI_Pareto_plot.R: produce figure 6  
 - DCI_SensitivityAnalysis_plot: produce sensitivity analysis figure  
+
+## Changes since upload to figshare research compendium 
+- 2021/01/05: replaced references to TARGET_FID in dam attribute table to DAMID for consistency with file structure in repository/compendium
