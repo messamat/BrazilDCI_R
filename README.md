@@ -17,7 +17,7 @@ to restore the project library locally on their machine.
 The only files needed for the core of the R analysis are:   
 - results/dci.gdb/networkattributes  
 - results/dci.gdb/damattributes  
-Both are available in the study's figshare permanent repository (add link).
+Both are available in the study's [figshare permanent repository](https://figshare.com/s/5ba67b7f58ccc812ae70).
 
 For ease of use, codes were numbered in the order that they need to be run for 
 reproducing the analysis.  
