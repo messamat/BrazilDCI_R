@@ -17,7 +17,7 @@ to restore the project library locally on their machine.
 The only files needed for the core of the R analysis are:   
 - results/dci.gdb/networkattributes  
 - results/dci.gdb/damattributes  
-Both are available in the study's figshare permanent repository (add link).
+Both are available in the study's [figshare permanent repository](https://figshare.com/s/5ba67b7f58ccc812ae70).
 
 For ease of use, codes were numbered in the order that they need to be run for 
 reproducing the analysis.  
@@ -50,3 +50,6 @@ To proceed with the analysis, run the scripts in the following order
 - DCI_IndividualsDams_plot.R: produce figure 5  
 - DCI_Pareto_plot.R: produce figure 6  
 - DCI_SensitivityAnalysis_plot: produce sensitivity analysis figure  
+
+## Changes since upload to figshare research compendium 
+- 2021/01/05: replaced references to TARGET_FID in dam attribute table to DAMID for consistency with file structure in repository/compendium
