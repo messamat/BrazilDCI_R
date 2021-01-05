@@ -102,7 +102,7 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
             UpSeg <- paste("seg", DamX$UpSeg, sep ="")
             Type <- DamX$Tipo_1
             Situation <- DamX$ESTAGIO_1
-            ID_number <- DamX$TARGET_FID
+            ID_number <- DamX$DAMID
             ID_name <- DamX$NOME
             Basin <- DamX$DAMBAS_ID08
             Year <- DamX$INIC_OPER
@@ -205,87 +205,95 @@ damfragment_time <- function(DamAttributes, NetworkBRAZIL, DCIfunc, DCIname) {
   
   
   ## Plot figure
+  fig1func <- function() {
+    par (oma = c(5, 5, 3, 4), mar = c(0.5, 0, 0, 0), bty = "n")
+    plot(YearVec, MatrixSHP[1,], ylim = c(0, 100), xlim = c(1899, 2043),
+         type = "n", ylab = "", xlab = "", 
+         xaxt = "n", yaxt = "n")
+    
+    # Plot axis
+    axis(side = 2, at = c(0, 25, 50, 75, 100), cex.axis = 2.6, line = - 2)
+    axis(side = 1, at = c(1900, 1920, 1940, 1960, 1980, 2000, 2018), 
+         cex.axis = 2.6, line = -0.8, mgp = c(3, 1.45, 0))
+    axis(side = 1, at = c(2025, 2042), labels = c("",""), 
+         cex.axis = 2.3, line = -0.8, mgp = c(3, 1.25, 0))
+    #axis(side = 1, at = c(2031), labels = c("Future"), cex.axis = 2.3, line = -1)
+    mtext("Future", side = 1, line = 0.6, cex = 2.6, at = 2034)
+    mtext("River connectivity (DCI)", side = 2, cex = 3.2, line = 2.1)
+    mtext("Year", side = 1, cex = 3.2, line = 3.5)
+    
+    ## Plot a line for each basin (rows)
+    # SHPs
+    for (i in 1: dim(MatrixSHP)[1]) {
+      lines(YearVec, MatrixSHP[i,], col = "#8B000015", lwd = 3.8, lty = 1)
+    }
+    
+    # LHPs
+    for (i in 1: dim(MatrixLHP)[1]) {
+      lines(YearVec, MatrixLHP[i,], col = "#4876FF15", lwd = 3.8, lty = 1)
+    }
+    
+    
+    # Plot the average lines SHP
+    averageDCISHP <- colSums(MatrixSHP)/dim(MatrixSHP)[1]
+    lines(YearVec, averageDCISHP, col = "black", lwd = 4.5, lty = 3)
+    
+    # Plot the average lines LHP
+    averageDCILHP <- colSums(MatrixLHP)/dim(MatrixLHP)[1]
+    lines(YearVec, averageDCILHP, col = "black", lwd = 4.5, lty = 5)
+    
+    # Plot the average lines All
+    averageDCIAll <- colSums(MatrixAll)/dim(MatrixAll)[1]
+    lines(YearVec, averageDCIAll, col = "black", lwd = 4.5, lty = 1)
+    
+    ## Plot future lines
+    # SHPs
+    for (i in 1: dim(resuDCI)[1]){
+      lines(c(2025, 2042), c(resuDCI$SHP_curr[i], resuDCI$SHP_fut[i]),
+            col = "#8B000015", lwd = 3.8, lty = 1)
+    }
+    
+    # LHPs
+    for (i in 1: dim(resuDCI)[1]){
+      lines(c(2025, 2042), c(resuDCI$LHP_curr[i], resuDCI$LHP_fut[i]), 
+            col = "#4876FF15", lwd = 3.8, lty = 1)
+    }
+    
+    # Calculate average lines for current and future dams
+    averageFutAll <- c(mean(resuDCI$All_curr), mean(resuDCI$All_fut))
+    averageFutSHP <- c(mean(resuDCI$SHP_curr), mean(resuDCI$SHP_fut))
+    averageFutLHP <- c(mean(resuDCI$LHP_curr), mean(resuDCI$LHP_fut))
+    
+    # Plot average lines
+    lines(c(2025, 2042), averageFutSHP, col = "black", lwd = 4.5, lty = 3)
+    lines(c(2025, 2042), averageFutLHP, col = "black", lwd = 4.5, lty = 5)
+    lines(c(2025, 2042), averageFutAll, col = "black", lwd = 4.5, lty = 1)
+    
+    # Plot average points
+    points(2043, averageFutSHP[2], pch = 21, bg = "#8B0000", cex = 2.8)
+    points(2043, averageFutLHP[2], pch = 21, bg = "#4876FF", cex = 2.8)
+    points(2043, averageFutAll[2], pch = 21, bg = "#9400D3", cex = 2.8)
+    
+    points(2019, averageFutSHP[1], pch = 21, bg = "#8B0000", cex = 2.8)
+    points(2019, averageFutLHP[1], pch = 21, bg = "#4876FF", cex = 2.8)
+    points(2019, averageFutAll[1], pch = 21, bg = "#9400D3", cex = 2.8)
+    
+    
+    text("SHPs", cex = 2.0, y=averageFutSHP[2]+1, x=2050, xpd=NA)
+    text("LHPs", cex = 2.0, y=averageFutLHP[2]+1, x=2050, xpd=NA)
+    text("All", cex = 2.0, y=averageFutAll[2]+1, x=2047, xpd=NA)
+  }
+  
   outfigname = file.path(figdir, paste0("Figure1_", DCIname, "_",
-                                        format(Sys.Date(), '%Y%m%d'), ".tiff"))
-  tiff(filename = outfigname,
-       height = 2396, width = 4400, res = 300, compression = c("lzw"))
+                                        format(Sys.Date(), '%Y%m%d')))
+  jpeg(filename = paste0(outfigname, '.jpg'),
+       height = 2396, width = 4400, res = 300)
+  fig1func()
+  dev.off()
   
-  par (oma = c(5, 5, 3, 4), mar = c(0.5, 0, 0, 0), bty = "n")
-  plot(YearVec, MatrixSHP[1,], ylim = c(0, 100), xlim = c(1899, 2043),
-       type = "n", ylab = "", xlab = "", 
-       xaxt = "n", yaxt = "n")
-  
-  # Plot axis
-  axis(side = 2, at = c(0, 25, 50, 75, 100), cex.axis = 2.6, line = - 2)
-  axis(side = 1, at = c(1900, 1920, 1940, 1960, 1980, 2000, 2018), 
-       cex.axis = 2.6, line = -0.8, mgp = c(3, 1.45, 0))
-  axis(side = 1, at = c(2025, 2042), labels = c("",""), 
-       cex.axis = 2.3, line = -0.8, mgp = c(3, 1.25, 0))
-  #axis(side = 1, at = c(2031), labels = c("Future"), cex.axis = 2.3, line = -1)
-  mtext("Future", side = 1, line = 0.6, cex = 2.6, at = 2034)
-  mtext("River connectivity (DCI)", side = 2, cex = 3.2, line = 2.1)
-  mtext("Year", side = 1, cex = 3.2, line = 3.5)
-  
-  ## Plot a line for each basin (rows)
-  # SHPs
-  for (i in 1: dim(MatrixSHP)[1]) {
-    lines(YearVec, MatrixSHP[i,], col = "#8B000015", lwd = 3.8, lty = 1)
-  }
-  
-  # LHPs
-  for (i in 1: dim(MatrixLHP)[1]) {
-    lines(YearVec, MatrixLHP[i,], col = "#4876FF15", lwd = 3.8, lty = 1)
-  }
-  
-  
-  # Plot the average lines SHP
-  averageDCISHP <- colSums(MatrixSHP)/dim(MatrixSHP)[1]
-  lines(YearVec, averageDCISHP, col = "black", lwd = 4.5, lty = 3)
-  
-  # Plot the average lines LHP
-  averageDCILHP <- colSums(MatrixLHP)/dim(MatrixLHP)[1]
-  lines(YearVec, averageDCILHP, col = "black", lwd = 4.5, lty = 5)
-  
-  # Plot the average lines All
-  averageDCIAll <- colSums(MatrixAll)/dim(MatrixAll)[1]
-  lines(YearVec, averageDCIAll, col = "black", lwd = 4.5, lty = 1)
-  
-  ## Plot future lines
-  # SHPs
-  for (i in 1: dim(resuDCI)[1]){
-    lines(c(2025, 2042), c(resuDCI$SHP_curr[i], resuDCI$SHP_fut[i]),
-          col = "#8B000015", lwd = 3.8, lty = 1)
-  }
-  
-  # LHPs
-  for (i in 1: dim(resuDCI)[1]){
-    lines(c(2025, 2042), c(resuDCI$LHP_curr[i], resuDCI$LHP_fut[i]), 
-          col = "#4876FF15", lwd = 3.8, lty = 1)
-  }
-  
-  # Calculate average lines for current and future dams
-  averageFutAll <- c(mean(resuDCI$All_curr), mean(resuDCI$All_fut))
-  averageFutSHP <- c(mean(resuDCI$SHP_curr), mean(resuDCI$SHP_fut))
-  averageFutLHP <- c(mean(resuDCI$LHP_curr), mean(resuDCI$LHP_fut))
-  
-  # Plot average lines
-  lines(c(2025, 2042), averageFutSHP, col = "black", lwd = 4.5, lty = 3)
-  lines(c(2025, 2042), averageFutLHP, col = "black", lwd = 4.5, lty = 5)
-  lines(c(2025, 2042), averageFutAll, col = "black", lwd = 4.5, lty = 1)
-  
-  # Plot average points
-  points(2043, averageFutSHP[2], pch = 21, bg = "#8B0000", cex = 2.8)
-  points(2043, averageFutLHP[2], pch = 21, bg = "#4876FF", cex = 2.8)
-  points(2043, averageFutAll[2], pch = 21, bg = "#9400D3", cex = 2.8)
-  
-  points(2019, averageFutSHP[1], pch = 21, bg = "#8B0000", cex = 2.8)
-  points(2019, averageFutLHP[1], pch = 21, bg = "#4876FF", cex = 2.8)
-  points(2019, averageFutAll[1], pch = 21, bg = "#9400D3", cex = 2.8)
-  
-  mtext("SHPs", side = 1, cex = 2.0, line = -20.5, at = 2050)
-  mtext("LHPs", side = 1, cex = 2.0, line = -28, at = 2050)
-  mtext("All", side = 1, cex = 2.0, line = -18.5, at = 2048)
-  
+  pdf(file = paste0(outfigname, '.pdf'),
+      height = 2396/300, width = 4400/300)
+  fig1func()
   dev.off()
 }
 
@@ -296,11 +304,10 @@ damfragment_time(DamAttributes = DamAttributes,
                  DCIname = 'DCIp')
 
 
-# damfragment_time(DamAttributes = DamAttributes,
-#                  NetworkBRAZIL = NetworkBRAZIL,
-#                  DCIfunc = DCIi_opti,
-#                  DCIname = 'DCIi')
-
+damfragment_time(DamAttributes = DamAttributes,
+                 NetworkBRAZIL = NetworkBRAZIL,
+                 DCIfunc = DCIi_opti,
+                 DCIname = 'DCIi')
 
 
   ###############################################################################################

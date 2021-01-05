@@ -8,6 +8,7 @@ library(fst)
 library(geiger)
 library(geosphere)
 library(ggplot2)
+library(ggrastr)
 library(igraph) # library graph theory
 library(jpeg)
 library(magrittr)
